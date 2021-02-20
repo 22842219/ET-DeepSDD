@@ -1,5 +1,5 @@
 # ET-DeepSDD: An Efficient Neural Probabilistic Logical Solution to Entity Typing
 
-A CUDA-enabled PyTorch and SDD implemention for ET-DeepSDD based on this paper
+A CUDA-enabled PyTorch and pysdd implemention for ET-DeepSDD: "An Efficient Neural Probabilistic Logical Solution to Entity Typing"
 
-SDD package is downloaded from http://reasoning.cs.ucla.edu/sdd/
+pysdd package is downloaded from https://github.com/wannesm/PySDD
