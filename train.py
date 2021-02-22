@@ -18,12 +18,14 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-# from torch.utils.tensorboard import SummaryWriter
-# writer = SummaryWriter()
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter('runs/bbn_modified_baseline')
 
 
 torch.manual_seed(123)
 torch.backends.cudnn.deterministic=True
+
+
 
 
 # Train the model, evaluating it every 10 epochs.
@@ -46,8 +48,7 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 
 	num_batches = len(data_loaders["train"])
 	progress_bar = ProgressBar(num_batches = num_batches, max_epochs = cf.MAX_EPOCHS, logger = logger)
-	avg_loss_list = ['avg_loss']
-	# epoch_losses = []
+	avg_loss_list = []
 	# Train the model
 	for epoch in range(epoch_start, cf.MAX_EPOCHS + 1):
 		epoch_start_time = time.time()
@@ -126,8 +127,6 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 				bert_embs_m  = wordpieces_to_bert_embs(wordpieces_m, bc).to(device)
 				
 				batch_y = batch_y.float().to(device)
-				# batch_y = batch_y.cuda()	
-				
 				
 				# 3. Feed these Bert vectors to our model
 				model.zero_grad()
@@ -135,9 +134,8 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 
 				y_hat = model(bert_embs_l, bert_embs_r, None, bert_embs_m)	
 
-
 				loss = model.calculate_loss(y_hat, batch_y)
-				# writer.add_scalar("Loss/train", loss, epoch)
+				writer.add_scalar("Loss/train", loss, epoch)
 
 				# 4. Backpropagate
 				# loss.backward() computes dloss/dx for every parameter x which has requires_grad = True. x.grad += dloss/dx
@@ -151,18 +149,13 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 
 					
 
-		# _create_python_plot(epoch_losses)
 		avg_loss = sum(epoch_losses) / float(len(epoch_losses))
 		avg_loss_list.append(avg_loss)
 
-		progress_bar.draw_completed_epoch(avg_loss, avg_loss_list[1::], epoch, epoch_start_time)
+		progress_bar.draw_completed_epoch(avg_loss, avg_loss_list, epoch, epoch_start_time)
 
-		#logger.info(avg_loss)
 
 		modelEvaluator.evaluate_every_n_epochs(1, epoch)
-
-	_create_python_plot(avg_loss_list)
-
 
 
 def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
@@ -195,7 +188,8 @@ def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wor
 							mention_window = cf.MODEL_OPTIONS['mention_window'],
 							attention_type = cf.MODEL_OPTIONS['attention_type'],
 							use_context_encoders = cf.MODEL_OPTIONS['use_context_encoders'],
-							coe_wmc = cf.MODEL_OPTIONS['coe_wmc'])
+							use_bilstm = cf.MODEL_OPTIONS['use_bilstm'],
+							use_marginal_ranking_loss = cf.MODEL_OPTIONS['use_marginal_ranking_loss'])
 	return model
 
 
@@ -209,49 +203,6 @@ def train_without_loading(data_loaders, word_vocab, wordpiece_vocab, hierarchy, 
 	train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy)
 
 
-def _create_python_plot(scores, log_scale=False):
-	"""
-	Create a python plot of loss, MiF1, MaF1, Acc vs epoch using the given information. Afterwards,
-	the figure is available via plt, e.g.
-	plt.savefig(plot_filename, bbox_inches='tight')
-	plt.show()
-	plt.clf()
-	:param scores: A list containing the score for each epoch.
-	:type score: list[float]     
-	:param log_scale: Whether to use log scale for score.
-	:type log_scale: bool
-	"""
-	
-	epochs = list(range(0, len(scores)-1)) 
-	fig, ax1 = plt.subplots()
-
-	ylabel = "{}".format(str(scores[0]))
-	print("ylabel:", ylabel)
-	ax1.set_xlabel('epoch')
-	ax1.set_ylabel(ylabel)
-	line = ax1.plot(epochs, scores[1::], 'r-')
-	if log_scale:
-		ax1.set_yscale('log')
-
-	ax1.legend(loc='upper left')
-	fig.tight_layout()  # otherwise the right y-label is slightly clipped
-
-	path = "./results"
-	plt_name = "{}.jpg".format(str(scores[0]))
-	plot_filename =os.path.join(path, plt_name)
-	plt.savefig(plot_filename)
-	plt.show()
-	
-	filepath = os.path.join(path, str(scores[0]))
-	with open(filepath, 'w') as f:
-		f.write("{}".format(str(scores[0])))
-		for i in range(1, len(scores)-1):
-			f.write("({},{})".format(i, scores[i]))
-		f.write("\n\n")
-
-
-
-
 def main():		
 
 	logger.info("Loading files...")
@@ -261,17 +212,12 @@ def main():
 	wordpiece_vocab = dutils.load_obj_from_pkl_file('wordpiece vocab', cf.ASSET_FOLDER + '/wordpiece_vocab.pkl')
 	total_wordpieces = dutils.load_obj_from_pkl_file('total wordpieces', cf.ASSET_FOLDER + '/total_wordpieces.pkl')
 	hierarchy = dutils.load_obj_from_pkl_file('hierarchy', cf.ASSET_FOLDER + '/hierarchy.pkl')
-	# print("hierarchy:", hierarchy)
-
 	
 	logger.info("Building model.")
-
 	model = create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces)		
 	model.cuda()
-
-
 	train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy)
-	# writer.flush()
+	writer.flush()
 
 		
 

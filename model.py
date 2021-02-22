@@ -25,15 +25,9 @@ import numpy as np
 from typing import *
 import math
 
-# import argparse
-# import sys
-
-
-
-here = Path(__file__).parent
 
 class MentionLevelModel(nn.Module):
-	def __init__(self, embedding_dim, hidden_dim, bottleneck_dim, vocab_size, label_size, coe_wmc, dataset, model_options, total_wordpieces, category_counts, hierarchy_matrix, context_window, mention_window, attention_type, use_context_encoders):
+	def __init__(self, embedding_dim, hidden_dim, bottleneck_dim, vocab_size, label_size, dataset, model_options, total_wordpieces, category_counts, hierarchy_matrix, context_window, mention_window, attention_type, use_context_encoders, use_bilstm, use_marginal_ranking_loss):
 		super(MentionLevelModel, self).__init__()
 
 		self.embedding_dim = embedding_dim
@@ -42,12 +36,15 @@ class MentionLevelModel(nn.Module):
 		self.label_size = label_size
 		self.bottleneck_dim = bottleneck_dim
 		self.dataset = dataset
-		self.coe_wmc = coe_wmc
+		self.use_bilstm = use_bilstm
+		self.use_marginal_ranking_loss = use_marginal_ranking_loss
 
 
-		# self.lstm = nn.LSTM(embedding_dim,hidden_dim,1,bidirectional=True)
-		# self.layer_1 = nn.Linear(hidden_dim*6, hidden_dim)
-		self.layer_1 = nn.Linear(hidden_dim + hidden_dim + hidden_dim, hidden_dim)
+		if self.use_bilstm:
+			self.lstm = nn.LSTM(embedding_dim,hidden_dim,1,bidirectional=True)
+			self.layer_1 = nn.Linear(hidden_dim*6, hidden_dim)
+		else:
+			self.layer_1 = nn.Linear(hidden_dim + hidden_dim + hidden_dim, hidden_dim)
 
 		self.hidden2tag = nn.Linear(hidden_dim, label_size)
 		
@@ -87,25 +84,24 @@ class MentionLevelModel(nn.Module):
 			self.component_weights = nn.Parameter(torch.ones(3).float())
 
 
-
-
 	def forward(self, batch_xl, batch_xr, batch_xa, batch_xm):
 
 
 		# batch_xl = batch_xl[:, 0:self.context_window, :].mean(1)	# Truncate the weights to the appropriate window length, just in case BERT's max_seq_len exceeds it	
 		# batch_xr = batch_xr[:, 0:self.context_window, :].mean(1)
 		# batch_xm = batch_xm[:, 0:self.mention_window, :].mean(1)
+		if self.use_bilstm:		
 
-		# batch_xl = batch_xl.unsqueeze(0)
-		# batch_xr = batch_xr.unsqueeze(0)
-		# batch_xm = batch_xm.unsqueeze(0)
+			batch_xl = batch_xl.unsqueeze(0)
+			batch_xr = batch_xr.unsqueeze(0)
+			batch_xm = batch_xm.unsqueeze(0)
 
-		# batch_xl, _ = self.lstm(batch_xl)
-		# batch_xr, _ = self.lstm(batch_xr)
-		# batch_xm, _ = self.lstm(batch_xm)
-		# batch_xl = batch_xl.squeeze(0)
-		# batch_xr = batch_xr.squeeze(0)
-		# batch_xm = batch_xm.squeeze(0)
+			batch_xl, _ = self.lstm(batch_xl)
+			batch_xr, _ = self.lstm(batch_xr)
+			batch_xm, _ = self.lstm(batch_xm)
+			batch_xl = batch_xl.squeeze(0)
+			batch_xr = batch_xr.squeeze(0)
+			batch_xm = batch_xm.squeeze(0)
 
 		if self.use_context_encoders:	
 
@@ -133,36 +129,30 @@ class MentionLevelModel(nn.Module):
 			y_hat = y_hat + self.bottleneck_weight * bottleneck_scores
 
 
-		# if self.use_hierarchy:
-		# 	for index, every_ in enumerate(y_hat):
-		# 		normalized_logits = torch.sigmoid(every_)
-		# 		wmc, likelihood = self.compute_wmc(normalized_logits)		
-		# 		wmc = torch.FloatTensor(wmc).to(device)
-		# 		likelihood = torch.FloatTensor(likelihood).to(device)
-		# 		joint_pro = torch.mul(normalized_logits,likelihood)
-		# 		y_hat[index] = torch.div(joint_pro, wmc)
-				# print("normalized_logits:", normalized_logits)
-				# print("wmc:", wmc)
-				# print("joint_pro:", joint_pro)
-				# print("y_hat:", y_hat)
-				# semantic_loss = torch.log(torch.mean(likelihood))			
+		if self.use_hierarchy:
+			for index, every_ in enumerate(y_hat):
+				normalized_logits = torch.sigmoid(every_)
+				wmc, likelihood = self.compute_wmc(normalized_logits)		
+				wmc = torch.FloatTensor(wmc).to(device)
+				likelihood = torch.FloatTensor(likelihood).to(device)
+				joint_pro = torch.mul(normalized_logits,likelihood)
+				y_hat[index] = torch.div(joint_pro, wmc)
 
 		return  y_hat
 
-	# def AtMostOne(self,literals, mgr):
-	# 	alpha = mgr.true()
-	# 	for lit in literals:
-	# 		alpha += ~lit			
-	# 	return alpha
+	def AtMostOne(self,literals, mgr):
+		alpha = mgr.true()
+		for lit in literals:
+			alpha += ~lit			
+		return alpha
 
-
-	# def implication(self,literals, mgr):
-	# 	alpha = mgr.true()
-	# 	beta0 = literals[0]
-	# 	for lit in literals[1:]:
-	# 		beta = ~lit | beta0  			
-	# 		alpha = alpha | beta
-	# 	return alpha
+	def implication(self,literals, mgr):
+		alpha = mgr.true()
+		beta0 = literals[0]
+		for lit in literals[1:]:
+			beta = ~lit | beta0  			
+			alpha = alpha | beta
+		return alpha
 
 	def exactly_one(self, lits, mgr):
 		alpha = mgr.false()
@@ -173,7 +163,6 @@ class MentionLevelModel(nn.Module):
 					beta = beta & ~lit2
 			alpha = alpha | beta
 		return alpha
-
 
 	def compute_wmc(self, every_) :
 
@@ -230,7 +219,7 @@ class MentionLevelModel(nn.Module):
 			column8 = SUBSTANCE | (~CHEMICAL & ~DRUG & ~FOOD)
 			column9 = WORK_OF_ART | (~BOOK & ~PLAY  & ~SONG)
 			mutually_exclusive = self.exactly_one(ANIMAL, CONTACT_INFO, DISEASE,EVENT, FACILITY, GAME, GPE, LANGUAGE, LAW, LOCATION, ORGANIZATION, PERSON, PLANT, PRODUCT, SUBSTANCE, WORK_OF_ART)
-			et_logical_formula = mutually_exclusive & column1 & column2 & column3 & column4 & column5 & column6 & column7 & column8 & column9
+			et_logical_formula = mutually_exclusive + (column1 & column2 & column3 & column4 & column5 & column6 & column7 & column8 & column9)
 		# #Minimize SDD
 		# et_logical_formula.ref()
 		# sdd_mgr.minimize_limited()
@@ -277,20 +266,17 @@ class MentionLevelModel(nn.Module):
 
 
 
-	def calculate_loss(self, y_hat, batch_y):		
+	def calculate_loss(self, y_hat, batch_y):	
+		if self.use_hierarchy:
+			if self.use_marginal_ranking_loss:
+				loss_fn = MarginLoss(0.9, 0.1, 0.5)
+			else:
+				loss_fn = nn.BCELoss()
+		else:
+			loss_fn = nn.BCEWithLogitsLoss()
 
-		# loss_fn = nn.BCEWithLogitsLoss()
-		# # loss_fn= nn.MSELoss()
-		# # loss_fn = nn.BCELoss()
-		# reconstruction_alpha = 0.0005
-		# reconstruction_loss = loss_fn(y_hat, batch_y)
-
-		marginal_ranking_criteria = MarginLoss(0.9, 0.1, 0.5)
-		margin_loss = marginal_ranking_criteria(y_hat, batch_y)
-		# print("margin loss:", margin_loss)
-		# loss = reconstruction_alpha * reconstruction_loss + margin_loss
 	
-		return margin_loss
+		return loss_fn(y_hat,batch_y)
 
 	# Predict the labels of a batch of wordpieces using a threshold of 0.5.
 	def predict_labels(self, preds):    	
@@ -336,7 +322,6 @@ class MarginLoss(nn.Module):
 		losses = batch_y.float() * F.relu(self.m_pos*t - y_hat).pow(2) + \
 				self.lambda_ * (1. - batch_y.float()) * F.relu(y_hat - self.m_neg*t).pow(2)
 		return losses.mean() if size_average else losses.sum()
-
 
 
 

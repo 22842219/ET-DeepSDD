@@ -1,0 +1,27 @@
+{
+	"dataset": "bbn_modified",
+	"model": "bbn_modified_baseline(NN)",
+	"embedding_dim": 768,
+	"hidden_dim": 768,
+	"bottleneck_dim":-1,
+	"max_epochs": 2000,
+	"learning_rate": 0.0001,
+	"max_sent_len": 100,
+	"stop_condition": 3,
+	"max_train_sents": "all",
+	"max_dev_sents": "all",
+	"max_test_sents": "all",
+	"batch_size": 100,
+	"model_options": {
+		"use_mention_layer": false,
+		"use_hierarchy": false,
+		"use_context_encoders": false,
+		"attention_type": "none",
+		"context_window": 10,
+		"mention_window": 10,	
+		"use_bilstm": false,
+		"use_marginal_ranking_loss":false
+},
+	"task": "mention_level",
+	"embedding_model": "bert"
+}
