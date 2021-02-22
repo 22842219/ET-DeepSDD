@@ -13,7 +13,6 @@
 	"max_test_sents": "all",
 	"batch_size": 100,
 	"model_options": {
-		"use_mention_layer": false,
 		"use_hierarchy": false,
 		"attention_type": "none",
 		"context_window": 10,
