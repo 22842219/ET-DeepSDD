@@ -133,14 +133,14 @@ class MentionLevelModel(nn.Module):
 			y_hat = y_hat + self.bottleneck_weight * bottleneck_scores
 
 
-		if self.use_hierarchy:
-			for index, every_ in enumerate(y_hat):
-				normalized_logits = torch.sigmoid(every_)
-				wmc, likelihood = self.compute_wmc(normalized_logits)		
-				wmc = torch.FloatTensor(wmc).to(device)
-				likelihood = torch.FloatTensor(likelihood).to(device)
-				joint_pro = torch.mul(normalized_logits,likelihood)
-				y_hat[index] = torch.div(joint_pro, wmc)
+		# if self.use_hierarchy:
+		# 	for index, every_ in enumerate(y_hat):
+		# 		normalized_logits = torch.sigmoid(every_)
+		# 		wmc, likelihood = self.compute_wmc(normalized_logits)		
+		# 		wmc = torch.FloatTensor(wmc).to(device)
+		# 		likelihood = torch.FloatTensor(likelihood).to(device)
+		# 		joint_pro = torch.mul(normalized_logits,likelihood)
+		# 		y_hat[index] = torch.div(joint_pro, wmc)
 				# print("normalized_logits:", normalized_logits)
 				# print("wmc:", wmc)
 				# print("joint_pro:", joint_pro)
@@ -280,17 +280,17 @@ class MentionLevelModel(nn.Module):
 	def calculate_loss(self, y_hat, batch_y):		
 
 		# loss_fn = nn.BCEWithLogitsLoss()
-		loss_f1 = nn.MSELoss()
-		# loss_fn = nn.BCELoss()
-		reconstruction_alpha = 0.0005
-		reconstruction_loss = loss_f1(y_hat, batch_y)
+		# # loss_fn= nn.MSELoss()
+		# # loss_fn = nn.BCELoss()
+		# reconstruction_alpha = 0.0005
+		# reconstruction_loss = loss_fn(y_hat, batch_y)
 
-		loss_f2 = MarginLoss(0.9, 0.1, 0.5)
-		margin_loss = loss_f2(y_hat, batch_y)
+		marginal_ranking_criteria = MarginLoss(0.9, 0.1, 0.5)
+		margin_loss = marginal_ranking_criteria(y_hat, batch_y)
 		# print("margin loss:", margin_loss)
-		loss = reconstruction_alpha * reconstruction_loss + margin_loss
+		# loss = reconstruction_alpha * reconstruction_loss + margin_loss
 	
-		return loss
+		return margin_loss
 
 	# Predict the labels of a batch of wordpieces using a threshold of 0.5.
 	def predict_labels(self, preds):    	
