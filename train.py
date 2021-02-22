@@ -11,21 +11,15 @@ from torch.autograd import Variable
 from load_config import load_config, device
 cf = load_config()
 from evaluate import ModelEvaluator
-import re
 import pandas as pd
 import os
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+
 
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter('runs/bbn_modified_baseline')
 
-
 torch.manual_seed(123)
 torch.backends.cudnn.deterministic=True
-
-
 
 
 # Train the model, evaluating it every 10 epochs.
@@ -53,153 +47,70 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 	for epoch in range(epoch_start, cf.MAX_EPOCHS + 1):
 		epoch_start_time = time.time()
 		epoch_losses = []
+		for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(data_loaders["train"]):
+			#torch.cuda.empty_cache()
+			#if i > 1:
+			#	continue
+			# 1. Convert the batch_x from wordpiece ids into wordpieces
+			wordpieces_l = batch_to_wordpieces(batch_xl, wordpiece_vocab)
+			wordpieces_r = batch_to_wordpieces(batch_xr, wordpiece_vocab)
+			#wordpieces_a = batch_to_wordpieces(batch_xa, wordpiece_vocab)
+			wordpieces_m = batch_to_wordpieces(batch_xm, wordpiece_vocab)
 
-		if cf.TASK == "end_to_end":
-			for (i, (batch_x, batch_y, batch_z, _, batch_tx, batch_ty, _)) in enumerate(data_loaders["train"]):
+			# 2. Encode the wordpieces into Bert vectors
+			bert_embs_l  = wordpieces_to_bert_embs(wordpieces_l, bc).to(device)
+			bert_embs_r  = wordpieces_to_bert_embs(wordpieces_r, bc).to(device)				
+			#bert_embs_a  = wordpieces_to_bert_embs(wordpieces_a, bc).to(device)
+			bert_embs_m  = wordpieces_to_bert_embs(wordpieces_m, bc).to(device)
 
-				if len(batch_x) < cf.BATCH_SIZE:
-					continue
+			batch_y = batch_y.float().to(device)
 
-				batch_y = batch_y.float().to(device)
-				batch_z = batch_z.float().to(device)
+			# 3. Feed these Bert vectors to our model
+			model.zero_grad()
+			model.train()
 
-				model.zero_grad()
-				model.train()
+			y_hat = model(bert_embs_l, bert_embs_r, None, bert_embs_m)	
 
-				#if i > 1:
-				#	continue
-				# 1. Convert the batch_x from wordpiece ids into wordpieces
-				if cf.EMBEDDING_MODEL == "bert":
-					wordpieces = batch_to_wordpieces(batch_x, wordpiece_vocab)
+			loss = model.calculate_loss(y_hat, batch_y)
+			writer.add_scalar("Loss/train", loss, epoch)
 
+			# 4. Backpropagate
+			# loss.backward() computes dloss/dx for every parameter x which has requires_grad = True. x.grad += dloss/dx
+			# optimizer.step updates the value of x using the gradient x.grad.			
+			loss.backward()
+			optimizer.step()
+			epoch_losses.append(loss)
 
-			
-					# 2. Encode the wordpieces into Bert vectors
-					bert_embs  = wordpieces_to_bert_embs(wordpieces, bc)
-
-					bert_embs = bert_embs.to(device)
-
-					y_hat = model(bert_embs)
-
-					loss = model.calculate_loss(y_hat, batch_x, batch_y, batch_z)
-					
-				elif cf.EMBEDDING_MODEL in ['random', 'glove', 'word2vec']:
-					batch_tx_cuda = batch_tx.long().to(device)
-					batch_ty = batch_ty.float().to(device)
-
-					#print(batch_tx.size())
-
-					y_hat = model(batch_tx_cuda)
-
-					loss = model.calculate_loss(y_hat, batch_tx, batch_ty, batch_z)
-
-				
-
-				# 3. Feed these Bert vectors to our model
-				
-
-				
-
-				# 4. Backpropagate
-				loss.backward()
-				optimizer.step()
-				epoch_losses.append(loss)
-
-				# 5. Draw the progress bar
-				progress_bar.draw_bar(i, epoch, epoch_start_time)
-
-		elif cf.TASK == "mention_level":
-			for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(data_loaders["train"]):
-
-				#torch.cuda.empty_cache()
-				#if i > 1:
-				#	continue
-				# 1. Convert the batch_x from wordpiece ids into wordpieces
-				wordpieces_l = batch_to_wordpieces(batch_xl, wordpiece_vocab)
-				wordpieces_r = batch_to_wordpieces(batch_xr, wordpiece_vocab)
-				#wordpieces_a = batch_to_wordpieces(batch_xa, wordpiece_vocab)
-				wordpieces_m = batch_to_wordpieces(batch_xm, wordpiece_vocab)
-	
-				# 2. Encode the wordpieces into Bert vectors
-				bert_embs_l  = wordpieces_to_bert_embs(wordpieces_l, bc).to(device)
-				bert_embs_r  = wordpieces_to_bert_embs(wordpieces_r, bc).to(device)				
-				#bert_embs_a  = wordpieces_to_bert_embs(wordpieces_a, bc).to(device)
-				bert_embs_m  = wordpieces_to_bert_embs(wordpieces_m, bc).to(device)
-				
-				batch_y = batch_y.float().to(device)
-				
-				# 3. Feed these Bert vectors to our model
-				model.zero_grad()
-				model.train()
-
-				y_hat = model(bert_embs_l, bert_embs_r, None, bert_embs_m)	
-
-				loss = model.calculate_loss(y_hat, batch_y)
-				writer.add_scalar("Loss/train", loss, epoch)
-
-				# 4. Backpropagate
-				# loss.backward() computes dloss/dx for every parameter x which has requires_grad = True. x.grad += dloss/dx
-				# optimizer.step updates the value of x using the gradient x.grad.			
-				loss.backward()
-				optimizer.step()
-				epoch_losses.append(loss)
-
-				# 5. Draw the progress bar
-				progress_bar.draw_bar(i, epoch, epoch_start_time)
-
-					
+			# 5. Draw the progress bar
+			progress_bar.draw_bar(i, epoch, epoch_start_time)	
 
 		avg_loss = sum(epoch_losses) / float(len(epoch_losses))
 		avg_loss_list.append(avg_loss)
-
-		progress_bar.draw_completed_epoch(avg_loss, avg_loss_list, epoch, epoch_start_time)
-
-
+		progress_bar.draw_completed_epoch(avg_loss, avg_loss_list, epoch, epoch_start_time)	
 		modelEvaluator.evaluate_every_n_epochs(1, epoch)
 
 
 def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
-	if cf.TASK == "end_to_end":
-		model = E2EETModel(	embedding_dim = cf.EMBEDDING_DIM,
-							hidden_dim = cf.HIDDEN_DIM,
-							vocab_size = len(wordpiece_vocab),
-							label_size = len(hierarchy),
-							dataset = cf.DATASET,
-							model_options = cf.MODEL_OPTIONS,
-							total_wordpieces = total_wordpieces,
-							category_counts = hierarchy.get_train_category_counts(),
-							hierarchy_matrix = hierarchy.hierarchy_matrix,
-							embedding_model = cf.EMBEDDING_MODEL,
-							vocab_size_word = len(word_vocab),
-							pretrained_embeddings = None if cf.EMBEDDING_MODEL in ["random", "bert"] else load_embeddings(cf.EMBEDDING_MODEL, word_vocab, cf.EMBEDDING_DIM))
-
-	elif cf.TASK == "mention_level":
-		model = MentionLevelModel(	embedding_dim = cf.EMBEDDING_DIM,
-							hidden_dim = cf.HIDDEN_DIM,
-							bottleneck_dim = cf.BOTTLENECK_DIM,
-							vocab_size = len(wordpiece_vocab),
-							label_size = len(hierarchy),
-							dataset = cf.DATASET,
-							model_options = cf.MODEL_OPTIONS,
-							total_wordpieces = total_wordpieces,
-							category_counts = hierarchy.get_train_category_counts(),
-							hierarchy_matrix = hierarchy.hierarchy_matrix,
-							context_window = cf.MODEL_OPTIONS['context_window'],
-							mention_window = cf.MODEL_OPTIONS['mention_window'],
-							attention_type = cf.MODEL_OPTIONS['attention_type'],
-							use_context_encoders = cf.MODEL_OPTIONS['use_context_encoders'],
-							use_bilstm = cf.MODEL_OPTIONS['use_bilstm'],
-							use_marginal_ranking_loss = cf.MODEL_OPTIONS['use_marginal_ranking_loss'])
+	model = MentionLevelModel(	embedding_dim = cf.EMBEDDING_DIM,
+						hidden_dim = cf.HIDDEN_DIM,
+						bottleneck_dim = cf.BOTTLENECK_DIM,
+						vocab_size = len(wordpiece_vocab),
+						label_size = len(hierarchy),
+						dataset = cf.DATASET,
+						model_options = cf.MODEL_OPTIONS,
+						total_wordpieces = total_wordpieces,
+						category_counts = hierarchy.get_train_category_counts(),
+						hierarchy_matrix = hierarchy.hierarchy_matrix,
+						context_window = cf.MODEL_OPTIONS['context_window'],
+						mention_window = cf.MODEL_OPTIONS['mention_window'],
+						use_bilstm = cf.MODEL_OPTIONS['use_bilstm'],
+						use_marginal_ranking_loss = cf.MODEL_OPTIONS['use_marginal_ranking_loss'])
 	return model
 
 
 def train_without_loading(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
 	model = create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces)
 	model.cuda()
-
-	#logger.info("Loading model weights...")
-	#model.load_state_dict(torch.load(cf.BEST_MODEL_FILENAME))
-	
 	train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy)
 
 
