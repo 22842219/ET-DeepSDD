@@ -15,13 +15,11 @@
 	"model_options": {
 		"use_mention_layer": false,
 		"use_hierarchy": false,
-		"use_context_encoders": false,
 		"attention_type": "none",
 		"context_window": 10,
 		"mention_window": 10,	
 		"use_bilstm": false,
 		"use_marginal_ranking_loss":false
 },
-	"task": "mention_level",
 	"embedding_model": "bert"
 }
