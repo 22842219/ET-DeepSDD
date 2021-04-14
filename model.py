@@ -7,6 +7,7 @@ from load_config import device
 import pandas as pd
 import pysdd
 from pysdd.sdd import Vtree, SddManager, WmcManager
+
 from pysdd.iterator import SddIterator
 from array import array
 from graphviz import Source
@@ -46,14 +47,17 @@ class MarginLoss(nn.Module):
 
 
 
+
 class MentionLevelModel(nn.Module):
 	def __init__(self, embedding_dim, hidden_dim, vocab_size, label_size, dataset, model_options, total_wordpieces, category_counts, hierarchy_matrix, context_window, mention_window, attention_type, use_context_encoders):
+
 		super(MentionLevelModel, self).__init__()
 
 		self.embedding_dim = embedding_dim
 		self.hidden_dim = hidden_dim
 		self.vocab_size = vocab_size
 		self.label_size = label_size
+
 		self.dataset = dataset
 
 		self.use_hierarchy = model_options['use_hierarchy']
@@ -71,6 +75,7 @@ class MentionLevelModel(nn.Module):
 
 		self.dropout = nn.Dropout(p=0.5)
 
+
 		self.dropout_l = nn.Dropout(p=0.5)
 		self.dropout_r = nn.Dropout(p=0.5)
 		self.dropout_m = nn.Dropout(p=0.5)
@@ -78,6 +83,7 @@ class MentionLevelModel(nn.Module):
 		self.hierarchy_matrix = hierarchy_matrix
 		self.context_window = context_window
 		self.mention_window = mention_window
+
 
 		self.left_enc = nn.Linear(embedding_dim, hidden_dim)
 		self.right_enc = nn.Linear(embedding_dim, hidden_dim)
@@ -97,6 +103,7 @@ class MentionLevelModel(nn.Module):
 	def forward(self, batch_xl, batch_xr, batch_xa, batch_xm):		
 
 		if self.use_bilstm:		
+
 			batch_xl = batch_xl.unsqueeze(0)
 			batch_xr = batch_xr.unsqueeze(0)
 			batch_xm = batch_xm.unsqueeze(0)
@@ -107,6 +114,7 @@ class MentionLevelModel(nn.Module):
 			batch_xl = batch_xl.squeeze(0)
 			batch_xr = batch_xr.squeeze(0)
 			batch_xm = batch_xm.squeeze(0)
+
 
 		if self.use_context_encoders:		
 
@@ -148,12 +156,15 @@ class MentionLevelModel(nn.Module):
 
 	def AtMostOne(self,literals, mgr):
 		alpha = mgr.false()
+
 		for lit in literals:
 			alpha += ~lit			
 		return alpha
 
 	def implication(self,literals, mgr):
+
 		alpha = mgr.false()
+
 		beta0 = literals[0]
 		for lit in literals[1:]:
 			beta = ~lit | beta0  			
@@ -205,6 +216,7 @@ class MentionLevelModel(nn.Module):
 			mutually_exclusive = self.exactly_one((ANIMAL, CONTACT_INFO, DISEASE, EVENT, FAC, GAME, GPE, LANGUAGE, LAW, LOCATION, ORGANIZATION, PERSON, PLANT, PRODUCT, SUBSTANCE, WORK_OF_ART), sdd_mgr)   
 			et_logical_formula = mutually_exclusive & column1 & column2 & column3 & column4 & column5 & column6 & column7 & column8 & column9 
 			# et_logical_formula = (~ANIMAL| ~CONTACT_INFO| ~DISEASE| ~EVENT| ~FAC| ~FACILITY| ~GAME| ~GPE| ~LANGUAGE| ~LAW| ~LOCATION|  ~ORGANIZATION| ~PERSON| ~PLANT| ~PRODUCT| ~SUBSTANCE| ~WORK_OF_ART)& column1 & column2 & column3 & column4 & column5 & column6 & column7 & column8 & column9 & column10 & column11
+
 		elif self.dataset == 'ontonotes_modified':	
 			location,celestial,city,country,geography,body_of_water,park,structure,airport,government,hotel,sports_facility,transit,bridge,railway,road,organization,company,broadcast,news,education,government,military,political_party,sports_team,stock_exchange,other,art,broadcast,film,music,stage,writing,body_part,currency,event,election,holiday,natural_disaster,protest,sports_event,violent_conflict,food,health,treatment,heritage,legal,living_thing,animal,product,car,computer,software,weapon,religion,scientific,sports_and_leisure,person,artist,actor,author,music,athlete,business,doctor,education,student,teacher,legal,military,political_figure,title  = sdd_mgr.vars
 			column1 = location | (~celestial & ~ city& ~country & ~geography & ~park & ~structure & ~transit )
@@ -301,6 +313,7 @@ class MentionLevelModel(nn.Module):
 			et_logical_formula = self.exactly_one((Abbreviation, Activity, Agent, Attribute, Cardinality, Consumable, Event, Item, Location, Observation, Specifier, Time, Typo, Unsure),sdd_mgr)& column1
 
 
+
 		weights = torch.cat((every_, every_))
 		for i, p in enumerate(every_):	
 			weights[i] = 1.0 - every_[len(every_)-1-i]
@@ -349,6 +362,7 @@ class MentionLevelModel(nn.Module):
 
 		return loss
 
+
 	# Predict the labels of a batch of wordpieces using a threshold of 0.5.
 	def predict_labels(self, preds):    	
 		hits  = (preds > 0.5).float()
@@ -374,3 +388,4 @@ class MentionLevelModel(nn.Module):
 		preds = self.forward(batch_xl, batch_xr, batch_xa, batch_xm)
 		print(preds)
 		return self.predict_labels(preds)
+

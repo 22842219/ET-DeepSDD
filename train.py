@@ -2,7 +2,11 @@ import data_utils as dutils
 from data_utils import Vocab, CategoryHierarchy, EntityTypingDataset, batch_to_wordpieces, wordpieces_to_bert_embs, load_embeddings
 from bert_serving.client import BertClient
 from logger import logger
+<<<<<<< HEAD
 from model import MentionLevelModel
+=======
+from model import E2EETModel, MentionLevelModel
+>>>>>>> 7e33cfe11ba1500c7a9fe707d198f5ff53856fe0
 import torch.optim as optim
 from progress_bar import ProgressBar
 import time, json
@@ -13,6 +17,7 @@ cf = load_config()
 from evaluate import ModelEvaluator
 import pandas as pd
 import os
+<<<<<<< HEAD
 from pathlib import Path
 here = Path(__file__).parent
 
@@ -47,11 +52,13 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 	num_batches = len(data_loaders["train"])
 	progress_bar = ProgressBar(num_batches = num_batches, max_epochs = cf.MAX_EPOCHS, logger = logger)
 	avg_loss_list = []
+
 	epoch_losses = []
 	avg_loss_png= []
 	# Train the model
 	for epoch in range(epoch_start, cf.MAX_EPOCHS + 1):
 		epoch_start_time = time.time()
+
 
 		for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(data_loaders["train"]):
 			#torch.cuda.empty_cache()
@@ -79,13 +86,14 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 
 			loss = model.calculate_loss(y_hat, batch_y)
 			writer.add_scalar("Loss/train", loss, epoch)
+
 			
 			for j, row in enumerate(batch_y):
 				labels = hierarchy.onehot2categories(batch_y[j])
 				with open(here / "outputs" / "batch_y", "a") as out:
 					print(labels, file=out)
 					print(batch_y[j], file=out)
-				
+
 
 			# 4. Backpropagate
 			# loss.backward() computes dloss/dx for every parameter x which has requires_grad = True. x.grad += dloss/dx
@@ -93,6 +101,7 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 			loss.backward()
 			optimizer.step()
 			epoch_losses.append(loss)
+
 
 			# epoch_semantic_losses.append(semantic_loss)
 
@@ -128,6 +137,7 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
 	model = MentionLevelModel(	embedding_dim = cf.EMBEDDING_DIM,
 						hidden_dim = cf.HIDDEN_DIM,
+
 						vocab_size = len(wordpiece_vocab),
 						label_size = len(hierarchy),
 						dataset = cf.DATASET,
@@ -139,6 +149,7 @@ def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wor
 						mention_window = cf.MODEL_OPTIONS['mention_window'],
 						use_context_encoders = cf.MODEL_OPTIONS['use_context_encoders'],
 						hierarchy_matrix = hierarchy.hierarchy_matrix)
+
 	return model
 
 

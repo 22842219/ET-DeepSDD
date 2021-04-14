@@ -3,6 +3,7 @@
 A CUDA-enabled PyTorch and pysdd implemention for ET-DeepSDD: "An Efficient Neural Probabilistic Logical Solution to Entity Typing"
 
 pysdd package is downloaded from https://github.com/wannesm/PySDD
+<<<<<<< HEAD
 
 A google colab script to play with our model is attached as well.
 
@@ -40,4 +41,3 @@ python3 train.py
 ```
 
 The model will be evaluated during training on the dev set, and then evaluated on the test set once training is complete.
-# ET-DeepSDD

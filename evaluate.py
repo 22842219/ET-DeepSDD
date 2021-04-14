@@ -12,11 +12,13 @@ import re
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
 from pathlib import Path
 here = Path(__file__).parent
 
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter('runs/ontonotes_modified_sdd_March_KLD_coe2')
+
 
 torch.manual_seed(123)
 torch.backends.cudnn.deterministic=True
@@ -80,6 +82,7 @@ class ModelEvaluator():
 			bert_embs_r  = wordpieces_to_bert_embs(wordpieces_r, self.bc).to(device)				
 			#bert_embs_a  = wordpieces_to_bert_embs(wordpieces_a, self.bc).to(device)
 			bert_embs_m  = wordpieces_to_bert_embs(wordpieces_m, self.bc).to(device)
+
 							
 			mention_preds = self.model.evaluate(bert_embs_l, bert_embs_r, None, bert_embs_m)
 
@@ -142,8 +145,6 @@ class ModelEvaluator():
 
 		
 
-
-
 		print("")
 		print(len(true_and_prediction))
 		micro, macro, acc = nfgec_evaluate.loose_micro(true_and_prediction)[2], nfgec_evaluate.loose_macro(true_and_prediction)[2], nfgec_evaluate.strict(true_and_prediction)[2]
@@ -152,8 +153,6 @@ class ModelEvaluator():
 		accuracy_scores.append(acc)
 		average_scores.append((acc + macro + micro) / 3)
 		return (acc + macro + micro) / 3
-
-
 
 	# Save the best model to the best model directory, and save a small json file with some details (epoch, f1 score).
 	def save_best_model(self, f1_score, epoch):
@@ -197,20 +196,24 @@ class ModelEvaluator():
 				exit()
 				
 def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
+
 	from model import  MentionLevelModel
 	model = MentionLevelModel(	embedding_dim = cf.EMBEDDING_DIM,
 						hidden_dim = cf.HIDDEN_DIM,
+
 						vocab_size = len(wordpiece_vocab),
 						label_size = len(hierarchy),
 						dataset = cf.DATASET,
 						model_options = cf.MODEL_OPTIONS,
 						total_wordpieces = total_wordpieces,
 						category_counts = hierarchy.get_train_category_counts(),
+
 						context_window = cf.MODEL_OPTIONS['context_window'],
 						attention_type = cf.MODEL_OPTIONS['attention_type'],
 						mention_window = cf.MODEL_OPTIONS['mention_window'],
 						use_context_encoders = cf.MODEL_OPTIONS['use_context_encoders'],
 						hierarchy_matrix = hierarchy.hierarchy_matrix)
+
 	return model
 
 def evaluate_without_loading(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
@@ -232,7 +235,9 @@ def evaluate_without_loading(data_loaders, word_vocab, wordpiece_vocab, hierarch
 
 
 def main():
+
 	from model import  MentionLevelModel
+
 	from bert_serving.client import BertClient
 	import jsonlines	
 	bc = BertClient()
@@ -256,7 +261,9 @@ def main():
 			# writer.add_scalar("F1",f1_score , epoch)
 
 	modelEvaluator.evaluate_model(epoch)
+
 	writer.flush()	
+
 	
 
 if __name__ == "__main__":
