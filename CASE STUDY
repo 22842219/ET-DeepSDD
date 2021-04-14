@@ -1,0 +1,83 @@
+
+case study::
+NN(.)
+
+l o w e r   F i f t h   A v e n u e
+epoch 18 
+Predicted: /location
+Actual: /location, /location/transit, /location/transit/road
+
+
+
+
+
+
+----------------ontonotes_original----------
+
+
+
+
+DATA NOISE
+
+1) error spelling
+
+/location/geography/island  
+
+/location/geograpy/island   -----error spelling
+
+
+2) ambiguous label
+/organization/transit
+
+/location/transit
+/location/transit/bridge
+/location/transit/railway
+/location/transit/road
+
+
+
+
+----examples---------- noise labels
+entity: music centers
+baseline: (['/other', '/other/product'], ['/location'])
+sdd: ['/location']
+
+labels:/other, /other/product
+
+
+sentence:"Freddie", "Mac", "said", "the", "principal-only", "securities", "were", "priced", "at", "58", "1/4", "to", "yield", "8.45", "%", 
+	",", "assuming", "an", "average", "life", "of", "eight", "years", "and", "a", "prepayment", "of", "160", "%", "of", "the", "PSA", "model", "."], 
+Entity Mention:t h e   p r i n c i p a l
+sdd::Predicted: /person, /person/business
+baseline:'/person'
+Actual: /other
+
+
+
+
+
+
+-------bbn original-------
+1) abbreviation
+
+/FAC
+/FAC/AIRPORT
+/FAC/ATTRACTION
+/FAC/BRIDGE
+/FAC/BUILDING
+/FAC/HIGHWAY_STREET
+
+/FACILITY
+/FACILITY/AIRPORT
+/FACILITY/ATTRACTION
+/FACILITY/BRIDGE
+/FACILITY/BUILDING
+/FACILITY/HIGHWAY_STREET
+
+
+-----figer------
+1) duplicate 
+/government/government
+
+/living_thing
+/livingthing

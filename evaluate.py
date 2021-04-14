@@ -7,14 +7,16 @@ from data_utils import batch_to_wordpieces, wordpieces_to_bert_embs, build_token
 from sklearn.metrics import f1_score, classification_report, accuracy_score
 from colorama import Fore, Back, Style
 import random
-import nfgec_evaluate
+import nfgec_evaluate 
 import re
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from pathlib import Path
+here = Path(__file__).parent
 
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter('runs/bbn_modified_baseline')
+writer = SummaryWriter('runs/ontonotes_modified_sdd_March_KLD_coe2')
 
 torch.manual_seed(123)
 torch.backends.cudnn.deterministic=True
@@ -33,6 +35,7 @@ class ModelEvaluator():
 		self.best_f1_and_epoch = [0.0, -1]
 
 
+
 	# Evaluate a given model via F1 score over the entire test corpus.
 	def evaluate_model(self, epoch):
 		self.model.zero_grad()
@@ -43,43 +46,103 @@ class ModelEvaluator():
 		accuracy_scores = []
 		average_scores = []
 		num_batches = len(self.data_loader)
-		for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(self.data_loader):
+		labels_set = []
 
+		# Convert all one-hot to categories
+		def build_true_and_preds(self, tys, preds):
+			true_and_prediction = []
+			empty = 0
+			for i, row in enumerate(tys):	
+				true_cats = self.hierarchy.onehot2categories(tys[i])		
+				pred_cats = self.hierarchy.onehot2categories(preds[i])
+				true_and_prediction.append((true_cats,pred_cats))
+				if pred_cats == []:
+					empty += 1
+			if empty > 0:
+				logger.warn("There were %d empty predictions." % empty)
+			return true_and_prediction	
+	
+		
+		for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(self.data_loader):
+			
+			batch_true_and_predictions = []
+			entities = []
+			
 			# 1. Convert the batch_x from wordpiece ids into wordpieces
 			wordpieces_l = batch_to_wordpieces(batch_xl, self.wordpiece_vocab)
 			wordpieces_r = batch_to_wordpieces(batch_xr, self.wordpiece_vocab)
-			#wordpieces_a = batch_to_wordpieces(batch_xa, self.wordpiece_vocab)
+			wordpieces_a = batch_to_wordpieces(batch_xa, self.wordpiece_vocab)
 			wordpieces_m = batch_to_wordpieces(batch_xm, self.wordpiece_vocab)
+
 
 			# 2. Encode the wordpieces into Bert vectors
 			bert_embs_l  = wordpieces_to_bert_embs(wordpieces_l, self.bc).to(device)
 			bert_embs_r  = wordpieces_to_bert_embs(wordpieces_r, self.bc).to(device)				
 			#bert_embs_a  = wordpieces_to_bert_embs(wordpieces_a, self.bc).to(device)
 			bert_embs_m  = wordpieces_to_bert_embs(wordpieces_m, self.bc).to(device)
-			
+							
 			mention_preds = self.model.evaluate(bert_embs_l, bert_embs_r, None, bert_embs_m)
+
 			batch_y = batch_y.float().to(device)
+
 			for j, row in enumerate(batch_y):
+
+				
+
 				labels = self.hierarchy.onehot2categories(batch_y[j])
-				preds = self.hierarchy.onehot2categories(mention_preds[j])
+				preds = self.hierarchy.onehot2categories(mention_preds[j])	
+
+				if labels not in labels_set:
+					labels_set.append(labels)
+
+
 				true_and_prediction.append((labels, preds))
+				batch_true_and_predictions.append((labels, preds))
+
+				every_entity_mention = ' '.join(wordpieces_m[j])
+				every_entity_mention = re.sub("'", "", every_entity_mention)
+				# print("every_entity_mention:",every_entity_mention)
+				entities.append(every_entity_mention)
+
+				# every_entity_mention_sent = ' '.join(wordpieces_a[j])
+				# every_entity_mention_sent = re.sub("'", "", every_entity_mention_sent)
+
+			s = ""		
+			for i, every_tuple in enumerate(batch_true_and_predictions):
+				s += "Entity Mention:"
+				s += " ".join(entities[i])	
+				s += "\n"				
+				s += "Predicted: "
+				ps = ", ".join(["%s%s%s" % (Fore.GREEN if pred in every_tuple[0] else Fore.RED, pred, Style.RESET_ALL) for pred in every_tuple[1]])							
+				s += ps
+				s += "\n"	
+				s += "Actual: "							
+				s += ", ".join(every_tuple[0])
+				s += "\n\n"
+
+				for pred in every_tuple[1]:
+					if pred in every_tuple[0]:
+						with open(here / "outputs" / "ontonotes_modified_sdd_March_KLD_coe2_(partial)predicted", "a") as out:
+							print(entities[i], file=out)
+							print(every_tuple, file=out)
+					else:
+						with open(here / "outputs" / "ontonotes_modified_sdd_March_KLD_coe2_unpredicted", "a") as out:
+							print(entities[i], file=out)
+							print(every_tuple, file=out)
+
+			logger.info("\n" + s)	
+			
+				
 			sys.stdout.write("\rEvaluating batch %d / %d" % (i, num_batches))
 
+		with open(here / "outputs" / "ontonotes_modified_sdd_March_KLD_coe2_labels_set", "a") as out:
+			print(len(labels_set), file = out)
+			print(labels_set, file=out)
+		
 
-		# Convert all one-hot to categories
-		def build_true_and_preds(tys, preds):
-			true_and_prediction = []
-			empty = 0
-			for i, row in enumerate(tys):	
-				true_cats = self.hierarchy.onehot2categories(tys[i])		
-				pred_cats = self.hierarchy.onehot2categories(preds[i])
-				#if pred_cats == []:
-				#	empty += 1
-				true_and_prediction.append((true_cats, pred_cats))	
-			#if empty > 0:
-			#	logger.warn("There were %d empty predictions." % empty)
-			return true_and_prediction	
-	
+		
+
+
 
 		print("")
 		print(len(true_and_prediction))
@@ -89,6 +152,8 @@ class ModelEvaluator():
 		accuracy_scores.append(acc)
 		average_scores.append((acc + macro + micro) / 3)
 		return (acc + macro + micro) / 3
+
+
 
 	# Save the best model to the best model directory, and save a small json file with some details (epoch, f1 score).
 	def save_best_model(self, f1_score, epoch):
@@ -132,20 +197,20 @@ class ModelEvaluator():
 				exit()
 				
 def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
+	from model import  MentionLevelModel
 	model = MentionLevelModel(	embedding_dim = cf.EMBEDDING_DIM,
 						hidden_dim = cf.HIDDEN_DIM,
-						bottleneck_dim = cf.BOTTLENECK_DIM,
 						vocab_size = len(wordpiece_vocab),
 						label_size = len(hierarchy),
 						dataset = cf.DATASET,
 						model_options = cf.MODEL_OPTIONS,
 						total_wordpieces = total_wordpieces,
 						category_counts = hierarchy.get_train_category_counts(),
-						hierarchy_matrix = hierarchy.hierarchy_matrix,
 						context_window = cf.MODEL_OPTIONS['context_window'],
+						attention_type = cf.MODEL_OPTIONS['attention_type'],
 						mention_window = cf.MODEL_OPTIONS['mention_window'],
-						use_bilstm = cf.MODEL_OPTIONS['use_bilstm'],
-						use_marginal_ranking_loss = cf.MODEL_OPTIONS['use_marginal_ranking_loss'])
+						use_context_encoders = cf.MODEL_OPTIONS['use_context_encoders'],
+						hierarchy_matrix = hierarchy.hierarchy_matrix)
 	return model
 
 def evaluate_without_loading(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
@@ -167,7 +232,7 @@ def evaluate_without_loading(data_loaders, word_vocab, wordpiece_vocab, hierarch
 
 
 def main():
-	from model import E2EETModel, MentionLevelModel
+	from model import  MentionLevelModel
 	from bert_serving.client import BertClient
 	import jsonlines	
 	bc = BertClient()
@@ -191,6 +256,7 @@ def main():
 			# writer.add_scalar("F1",f1_score , epoch)
 
 	modelEvaluator.evaluate_model(epoch)
+	writer.flush()	
 	
 
 if __name__ == "__main__":

@@ -1,9 +1,8 @@
 {
-	"dataset": "bbn_modified",
-	"model": "bbn_modified_baseline(NN)",
+	"dataset": "ontonotes_modified",
+	"model": "ontonotes_modified_sdd_March_KLD_coe2",
 	"embedding_dim": 768,
 	"hidden_dim": 768,
-	"bottleneck_dim":-1,
 	"max_epochs": 2000,
 	"learning_rate": 0.0001,
 	"max_sent_len": 100,
@@ -13,12 +12,16 @@
 	"max_test_sents": "all",
 	"batch_size": 100,
 	"model_options": {
-		"use_hierarchy": false,
-		"attention_type": "none",
+		"use_hierarchy": true,
+		"use_context_encoders": false,
 		"context_window": 10,
-		"mention_window": 10,	
-		"use_bilstm": false,
+		"mention_window": 10,
+		"attention_type": "none",
+		"use_bilstm":false,
 		"use_marginal_ranking_loss":false
-},
+	},
 	"embedding_model": "bert"
 }
+
+
+
