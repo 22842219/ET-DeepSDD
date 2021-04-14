@@ -1,7 +1,9 @@
-outputs
-runs
+outputs/
+runs/
 wmc_script.py
 circle_loss.py
 exact_log_info.py
-pypsdd-master
-data
+/pypsdd-master
+data/
+
+
