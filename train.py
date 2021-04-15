@@ -2,11 +2,7 @@ import data_utils as dutils
 from data_utils import Vocab, CategoryHierarchy, EntityTypingDataset, batch_to_wordpieces, wordpieces_to_bert_embs, load_embeddings
 from bert_serving.client import BertClient
 from logger import logger
-<<<<<<< HEAD
 from model import MentionLevelModel
-=======
-from model import E2EETModel, MentionLevelModel
->>>>>>> 7e33cfe11ba1500c7a9fe707d198f5ff53856fe0
 import torch.optim as optim
 from progress_bar import ProgressBar
 import time, json
@@ -17,13 +13,12 @@ cf = load_config()
 from evaluate import ModelEvaluator
 import pandas as pd
 import os
-<<<<<<< HEAD
 from pathlib import Path
 here = Path(__file__).parent
 
 
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter('runs/ontonotes_modified_sdd_March_KLD_coe2')
+writer = SummaryWriter('runs/ontonotes_modified_sdd_March_KLD_coe1')
 
 
 torch.manual_seed(123)

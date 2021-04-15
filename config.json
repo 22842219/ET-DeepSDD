@@ -1,6 +1,6 @@
 {
 	"dataset": "ontonotes_modified",
-	"model": "ontonotes_modified_sdd_March_KLD_coe2",
+	"model": "ontonotes_modified_sdd_March_KLD_coe1",
 	"embedding_dim": 768,
 	"hidden_dim": 768,
 	"max_epochs": 2000,
