@@ -1,0 +1,26 @@
+{
+	"dataset": "ontonotes_modified",
+	"model": "ontonotes_modified_sdd_March_KLD_coe0.5",
+	"embedding_dim": 768,
+	"hidden_dim": 768,
+	"max_epochs": 2000,
+	"learning_rate": 0.0001,
+	"max_sent_len": 100,
+	"stop_condition": 3,
+	"max_train_sents": "all",
+	"max_dev_sents": "all",
+	"max_test_sents": "all",
+	"batch_size": 100,
+	"model_options": {
+		"use_hierarchy": true,
+		"use_context_encoders": false,
+		"context_window": 10,
+		"mention_window": 10,
+		"attention_type": "none",
+		"use_bilstm":false,
+		"use_marginal_ranking_loss":false
+	},
+	"embedding_model": "bert"
+}
+
+
