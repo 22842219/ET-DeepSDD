@@ -18,7 +18,7 @@ here = Path(__file__).parent
 
 
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter('runs/ontonotes_modified_sdd_March_KLD_coe1')
+writer = SummaryWriter('runs/ontonotes_modified_sdd_March_KLD_coe0.5')
 
 
 torch.manual_seed(123)

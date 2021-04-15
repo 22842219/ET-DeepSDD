@@ -17,7 +17,7 @@ from pathlib import Path
 here = Path(__file__).parent
 
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter('runs/ontonotes_modified_sdd_March_KLD_coe1')
+writer = SummaryWriter('runs/ontonotes_modified_sdd_March_KLD_coe0.5')
 
 
 torch.manual_seed(123)
@@ -125,11 +125,11 @@ class ModelEvaluator():
 
 				for pred in every_tuple[1]:
 					if pred in every_tuple[0]:
-						with open(here / "outputs" / "ontonotes_modified_sdd_March_KLD_coe2_(partial)predicted", "a") as out:
+						with open(here / "outputs" / "ontonotes_modified_sdd_March_KLD_coe0.5_(partial)predicted", "a") as out:
 							print(entities[i], file=out)
 							print(every_tuple, file=out)
 					else:
-						with open(here / "outputs" / "ontonotes_modified_sdd_March_KLD_coe2_unpredicted", "a") as out:
+						with open(here / "outputs" / "ontonotes_modified_sdd_March_KLD_coe0.5_unpredicted", "a") as out:
 							print(entities[i], file=out)
 							print(every_tuple, file=out)
 
@@ -138,7 +138,7 @@ class ModelEvaluator():
 				
 			sys.stdout.write("\rEvaluating batch %d / %d" % (i, num_batches))
 
-		with open(here / "outputs" / "ontonotes_modified_sdd_March_KLD_coe2_labels_set", "a") as out:
+		with open(here / "outputs" / "ontonotes_modified_sdd_March_KLD_coe0.5_labels_set", "a") as out:
 			print(len(labels_set), file = out)
 			print(labels_set, file=out)
 		
