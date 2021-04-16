@@ -145,63 +145,15 @@ class MentionLevelModel(nn.Module):
 		batch_x_out = self.dropout(torch.relu(self.layer_1(joined)))
 		y_hat = self.hidden2tag(batch_x_out)
 
-
 		return y_hat
 
 
-
-	def compute_wmc(self, every_) :	
-
-		vtree = Vtree.from_file(b"sdd_output/et_logical_formula.vtree")
-		sdd_mgr = SddManager.from_vtree(vtree)
-		et_logical_formula = sdd_mgr.read_sdd_file(b"sdd_output/et_logical_formula.sdd")
-
-
-		weights = torch.cat((every_, every_))
-		for i, p in enumerate(every_):	
-			weights[i] = 1.0 - every_[len(every_)-1-i]
-		weights = array('d', weights)
-
-		# Consitioned every literal to get marginal weighted model couting
-		conditioned_wmc = []		
-		wmc = []			
-		lits = [None] + [sdd_mgr.literal(i) for i in range(1, sdd_mgr.var_count() + 1)]	
-		for i in range(0, sdd_mgr.var_count()):	
-			wmc_mgr = et_logical_formula.wmc(log_mode = False) 
-			wmc_mgr.set_literal_weights_from_array(weights)						
-			wmc.append(wmc_mgr.propagate())
-			wmc_mgr.set_literal_weight(lits[i+1], 1)
-			wmc_mgr.set_literal_weight(-lits[i+1], 0)
-			every_conditioned_wmc = wmc_mgr.propagate()	#number of models where lits[i+1] being true
-			conditioned_wmc.append(every_conditioned_wmc)
-
-		return    conditioned_wmc, wmc
 
 	
 	def calculate_loss(self, y_hat, batch_y):
 		cross_entropy = nn.BCEWithLogitsLoss()
 		loss = cross_entropy(y_hat, batch_y)
-
-		if self.use_hierarchy:		
-			distribution_similarity = torch.empty(y_hat.size()).to(device)	
-			for index, every_ in enumerate(y_hat):
-				normalized_logits = torch.sigmoid(every_)
-				conditioned_wmc, wmc = self.compute_wmc(normalized_logits)
-				wmc = torch.FloatTensor(wmc).to(device)
-				conditioned_wmc = torch.FloatTensor(conditioned_wmc).to(device)
-				conditioned_pr = torch.div(conditioned_wmc, wmc)
-				log_cpr = torch.log(conditioned_pr)
-				distribution_similarity[index] = torch.mul(normalized_logits, log_cpr)
-				torch.clamp(distribution_similarity[index], min=0.0, max=1.0)
-				# with open(here / "outputs" / "y_hat_and_updated", "a") as out:
-				# 	print(normalized_logits, file=out)
-				# 	print(labeled_examples[index], file=out)
-			semantic_loss =  torch.mean(distribution_similarity)
-			print("semantic_loss:", semantic_loss)
-							
-			loss = loss - semantic_loss
-			print(loss)
-	
+		print("loss:",loss)
 
 		return loss
 

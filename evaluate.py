@@ -17,7 +17,7 @@ from pathlib import Path
 here = Path(__file__).parent
 
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter('runs/ontonotes_modified_sdd_March_KLD_coe0.5')
+writer = writer = SummaryWriter('runs/ontonotes_modified/sdd_KLD_coe0.5')
 
 
 torch.manual_seed(123)
@@ -125,20 +125,19 @@ class ModelEvaluator():
 
 				for pred in every_tuple[1]:
 					if pred in every_tuple[0]:
-						with open(here / "outputs" / "ontonotes_modified_sdd_March_KLD_coe0.5_(partial)predicted", "a") as out:
+						with open(here / "predictions" /self.model.dataset/ "(partial)predicted", "a") as out:
 							print(entities[i], file=out)
 							print(every_tuple, file=out)
 					else:
-						with open(here / "outputs" / "ontonotes_modified_sdd_March_KLD_coe0.5_unpredicted", "a") as out:
+						with open(here / "predictions" /self.model.dataset/ "unpredicted", "a") as out:
 							print(entities[i], file=out)
 							print(every_tuple, file=out)
 
 			logger.info("\n" + s)	
-			
 				
 			sys.stdout.write("\rEvaluating batch %d / %d" % (i, num_batches))
 
-		with open(here / "outputs" / "ontonotes_modified_sdd_March_KLD_coe0.5_labels_set", "a") as out:
+		with open(here / "predictions" /self.model.dataset/"labels_set", "a") as out:
 			print(len(labels_set), file = out)
 			print(labels_set, file=out)
 		
@@ -241,6 +240,8 @@ def main():
 	from bert_serving.client import BertClient
 	import jsonlines	
 	bc = BertClient()
+
+
 	
 	logger.info("Loading files...")
 	data_loaders = dutils.load_obj_from_pkl_file('data loaders', cf.ASSET_FOLDER + '/data_loaders.pkl')
@@ -254,17 +255,15 @@ def main():
 	model.cuda()
 	model.load_state_dict(torch.load(cf.BEST_MODEL_FILENAME))
 
+
 	modelEvaluator = ModelEvaluator(model, data_loaders['test'], word_vocab, wordpiece_vocab, hierarchy, bc, mode="test")	
 	with jsonlines.open(cf.BEST_MODEL_JSON_FILENAME, "r") as reader:
 		for line in reader:
 			f1_score, epoch = line['f1_score'], line['epoch']
 			# writer.add_scalar("F1",f1_score , epoch)
 
-	modelEvaluator.evaluate_model(epoch)
-
+	modelEvaluator.evaluate_model(epoch)	
 	writer.flush()	
-
-	
 
 if __name__ == "__main__":
 	main()

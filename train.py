@@ -15,10 +15,10 @@ import pandas as pd
 import os
 from pathlib import Path
 here = Path(__file__).parent
-
+from compute_mpe import CircuitMPE
 
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter('runs/ontonotes_modified_sdd_March_KLD_coe0.5')
+writer = writer = SummaryWriter('runs/ontonotes_modified/sdd_KLD_coe0.5')
 
 
 torch.manual_seed(123)
@@ -27,8 +27,6 @@ torch.backends.cudnn.deterministic=True
 
 # Train the model, evaluating it every 10 epochs.
 def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_start = 1):
-
-
 	logger.info("Training model.")
 
 	# Set up a new Bert Client, for encoding the wordpieces
@@ -79,13 +77,20 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 
 			y_hat = model(bert_embs_l, bert_embs_r, None, bert_embs_m)	
 
-			loss = model.calculate_loss(y_hat, batch_y)
+			# Create CircuitMPE for predictions
+			cmpe = CircuitMPE(bytes(here/"sdd_input"/model.dataset/"et.vtree"), bytes(here/"sdd_input"/model.dataset/"et.sdd"))
+			norm_y_hat = torch.sigmoid(y_hat)
+			semantic_loss = cmpe.compute_wmc(norm_y_hat)
+
+			print("semantic_loss:", semantic_loss)
+
+			loss = model.calculate_loss(y_hat, batch_y) - 0.5* semantic_loss
 			writer.add_scalar("Loss/train", loss, epoch)
 
 			
 			for j, row in enumerate(batch_y):
 				labels = hierarchy.onehot2categories(batch_y[j])
-				with open(here / "outputs" / "batch_y", "a") as out:
+				with open(here / "predictions" /model.dataset/ "batch_y", "a") as out:
 					print(labels, file=out)
 					print(batch_y[j], file=out)
 
@@ -97,12 +102,6 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 			optimizer.step()
 			epoch_losses.append(loss)
 
-
-			# epoch_semantic_losses.append(semantic_loss)
-
-			# semantic_loss.backward()
-			# optimizer_.step()
-
 			# 5. Draw the progress bar
 			progress_bar.draw_bar(i, epoch, epoch_start_time)	
 
@@ -111,22 +110,6 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 		progress_bar.draw_completed_epoch(avg_loss, avg_loss_list, epoch, epoch_start_time)	
 		avg_loss_png.append((epoch, avg_loss))
 		modelEvaluator.evaluate_every_n_epochs(1, epoch)
-
-	# import sys
-	# import matplotlib
-	# matplotlib.use('Agg')
-	# import matplotlib.pyplot as plt
-
-	# plt.figure(figsize=(10,5))
-	# plt.title("Average Loss During Training")
-	# plt.plot(avg_loss_png,label="avg_loss/Train")
-	# plt.xlabel("epoch")
-	# plt.ylabel("avg_loss")
-	# plt.legend()
-	# # plt.show()
-
-	# # plt.plot('epoch', 'avg_loss', data=avg_loss_png)
-	# plt.savefig(sys.stdout.buffer)
 
 
 def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
@@ -154,7 +137,7 @@ def train_without_loading(data_loaders, word_vocab, wordpiece_vocab, hierarchy, 
 	train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy)
 
 
-def main():		
+def main():			
 
 	logger.info("Loading files...")
 
@@ -167,6 +150,15 @@ def main():
 	logger.info("Building model.")
 	model = create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces)		
 	model.cuda()
+
+	folder ='{}/{}/{}/'.format(here, "predictions", model.dataset)
+	if not os.path.exists(os.path.dirname(folder)):
+		try:
+			os.makedirs(os.path.dirname(folder))
+		except OSError as exc:
+			if exc.errno != errno.EEXITST:
+				raise
+
 	train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy)
 	writer.flush()
 
