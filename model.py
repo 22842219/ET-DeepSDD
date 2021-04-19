@@ -43,6 +43,7 @@ class MentionLevelModel(nn.Module):
 		self.use_bilstm = model_options['use_bilstm']
 
 
+
 		if self.use_bilstm:
 			self.lstm = nn.LSTM(embedding_dim,hidden_dim,1,bidirectional=True)
 			self.layer_1 = nn.Linear(hidden_dim*6, hidden_dim)
@@ -133,6 +134,14 @@ class MentionLevelModel(nn.Module):
 		cross_entropy = nn.BCEWithLogitsLoss()
 		loss = cross_entropy(y_hat, batch_y)
 		print("loss:",loss)
+
+		if self.use_hierarchy:
+			# Create CircuitMPE for predictions
+			cmpe = CircuitMPE(bytes(here/"sdd_input"/model.dataset/"et.vtree"), bytes(here/"sdd_input"/model.dataset/"et.sdd"))
+			norm_y_hat = torch.sigmoid(y_hat)
+			semantic_loss = cmpe.compute_wmc(norm_y_hat)
+			print("semantic_loss:", semantic_loss)
+			loss = loss - 0.05 * semantic_loss
 
 		return loss
 

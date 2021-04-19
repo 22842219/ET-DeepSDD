@@ -18,7 +18,7 @@ here = Path(__file__).parent
 from compute_mpe import CircuitMPE
 
 from torch.utils.tensorboard import SummaryWriter
-writer = writer = SummaryWriter('runs/ontonotes_modified/sdd_KLD_coe0.5')
+writer = writer = SummaryWriter('runs/ontonotes_modified/sdd_KLD_coe0.005')
 
 
 torch.manual_seed(123)
@@ -77,14 +77,9 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 
 			y_hat = model(bert_embs_l, bert_embs_r, None, bert_embs_m)	
 
-			# Create CircuitMPE for predictions
-			cmpe = CircuitMPE(bytes(here/"sdd_input"/model.dataset/"et.vtree"), bytes(here/"sdd_input"/model.dataset/"et.sdd"))
-			norm_y_hat = torch.sigmoid(y_hat)
-			semantic_loss = cmpe.compute_wmc(norm_y_hat)
+			
 
-			print("semantic_loss:", semantic_loss)
-
-			loss = model.calculate_loss(y_hat, batch_y) - 0.5* semantic_loss
+			loss = model.calculate_loss(y_hat, batch_y) 
 			writer.add_scalar("Loss/train", loss, epoch)
 
 			

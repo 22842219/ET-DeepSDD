@@ -17,7 +17,7 @@ from pathlib import Path
 here = Path(__file__).parent
 
 from torch.utils.tensorboard import SummaryWriter
-writer = writer = SummaryWriter('runs/ontonotes_modified/sdd_KLD_coe0.5')
+writer = writer = SummaryWriter('runs/ontonotes_modified/sdd_KLD_coe0.005')
 
 
 torch.manual_seed(123)
@@ -129,7 +129,7 @@ class ModelEvaluator():
 							print(entities[i], file=out)
 							print(every_tuple, file=out)
 					else:
-						with open(here / "predictions" /self.model.dataset/ "unpredicted", "a") as out:
+						with open(here / "predictions" /self.model.dataset/"unpredicted", "a") as out:
 							print(entities[i], file=out)
 							print(every_tuple, file=out)
 
@@ -137,9 +137,9 @@ class ModelEvaluator():
 				
 			sys.stdout.write("\rEvaluating batch %d / %d" % (i, num_batches))
 
-		with open(here / "predictions" /self.model.dataset/"labels_set", "a") as out:
-			print(len(labels_set), file = out)
-			print(labels_set, file=out)
+			with open(here / "predictions" /self.model.dataset/"labels_set", "w") as out:
+				print(len(labels_set), file = out)
+				print(labels_set, file=out)
 		
 
 		
