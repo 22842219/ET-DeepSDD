@@ -19,7 +19,7 @@ from pathlib import Path
 here = Path(__file__).parent
 
 import re
-
+from compute_mpe import CircuitMPE
 
 
 torch.manual_seed(123)
@@ -137,7 +137,7 @@ class MentionLevelModel(nn.Module):
 
 		if self.use_hierarchy:
 			# Create CircuitMPE for predictions
-			cmpe = CircuitMPE(bytes(here/"sdd_input"/model.dataset/"et.vtree"), bytes(here/"sdd_input"/model.dataset/"et.sdd"))
+			cmpe = CircuitMPE(bytes(here/"sdd_input"/self.dataset/"et.vtree"), bytes(here/"sdd_input"/self.dataset/"et.sdd"))
 			norm_y_hat = torch.sigmoid(y_hat)
 			semantic_loss = cmpe.compute_wmc(norm_y_hat)
 			print("semantic_loss:", semantic_loss)
