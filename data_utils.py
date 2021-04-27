@@ -6,13 +6,8 @@ import codecs, sys
 import numpy as np
 from load_config import device
 
-
-sys.path.append('bert')
-import tokenization
-
-tokenizer = tokenization.FullTokenizer(
-	vocab_file='./data/bert/vocab.txt', do_lower_case=False)
-
+# Load the BERT tokenizer.
+tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased') 
 
 torch.manual_seed(123)
 torch.backends.cudnn.deterministic=True

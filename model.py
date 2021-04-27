@@ -133,7 +133,7 @@ class MentionLevelModel(nn.Module):
 	def calculate_loss(self, y_hat, batch_y):
 		cross_entropy = nn.BCEWithLogitsLoss()
 		loss = cross_entropy(y_hat, batch_y)
-		print("loss:",loss)
+		print("cross entropy loss:",loss)
 
 		if self.use_hierarchy:
 			# Create CircuitMPE for predictions
@@ -141,7 +141,8 @@ class MentionLevelModel(nn.Module):
 			norm_y_hat = torch.sigmoid(y_hat)
 			semantic_loss = cmpe.compute_wmc(norm_y_hat)
 			print("semantic_loss:", semantic_loss)
-			loss = loss - 0.05 * semantic_loss
+			loss = loss - 0.005 * semantic_loss
+			print("loss:", loss)
 
 		return loss
 
