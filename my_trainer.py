@@ -4,7 +4,7 @@ import json
 import datasets
 from datasets import load_dataset
 from pathlib import Path
-from bert_ import BertEncoder
+from bert_encoder import BertEncoder
 
 here = Path(__file__).parent
 torch.cuda.empty_cache()
