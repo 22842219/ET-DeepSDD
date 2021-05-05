@@ -1,25 +1,26 @@
-import data_utils as dutils
-from data_utils import Vocab, CategoryHierarchy, EntityTypingDataset, batch_to_wordpieces, wordpieces_to_bert_embs, load_embeddings
-from bert_serving.client import BertClient
-from logger import logger
-from model import MentionLevelModel
-import torch.optim as optim
-from progress_bar import ProgressBar
-import time, json
+
+import time, json, os
 import torch
 from torch.autograd import Variable
+from torch.optim.optimizer import Optimizer
+from torch.optim.adamw import AdamW
+
+from progress_bar import ProgressBar
+import data_utils as dutils
+from data_utils import Vocab, CategoryHierarchy, EntityTypingDataset, batch_to_wordpieces, load_embeddings
+from logger import logger
+from model import MentionLevelModel
+from bert_encoder import  get_contextualizer
+from evaluate import ModelEvaluator
 from load_config import load_config, device
 cf = load_config()
-from evaluate import ModelEvaluator
-import pandas as pd
-import os
+
+
 from pathlib import Path
 here = Path(__file__).parent
 
-
 from torch.utils.tensorboard import SummaryWriter
 writer = writer = SummaryWriter('runs/ontonotes_modified/bilstm_emb300')
-
 
 torch.manual_seed(123)
 torch.backends.cudnn.deterministic=True
@@ -29,16 +30,20 @@ torch.backends.cudnn.deterministic=True
 def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_start = 1):
 	logger.info("Training model.")
 
-	# Set up a new Bert Client, for encoding the wordpieces
+	# Set up a pre_trained bert model, for encoding the wordpieces
 	if cf.EMBEDDING_MODEL == "bert":
-		bc = BertClient()
+		bc =  get_contextualizer("bert-base-cased", device='cuda:0')
 	else:
 		bc = None
 
 	modelEvaluator = ModelEvaluator(model, data_loaders['dev'], word_vocab, wordpiece_vocab, hierarchy, bc)
 	
-	#optimizer = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=cf.LEARNING_RATE, momentum=0.9)
-	optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=cf.LEARNING_RATE)#, eps=1e-4, amsgrad=True)#, momentum=0.9)
+	optimizer = Optimizer.AdamW(
+        params=model.parameters(),
+        lr=cf.LEARNING_RATE,
+        weight_decay=0.1
+    )
+    
 	model.cuda()
 
 
@@ -52,51 +57,31 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 	for epoch in range(epoch_start, cf.MAX_EPOCHS + 1):
 		epoch_start_time = time.time()
 
-
 		for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(data_loaders["train"]):
-			#torch.cuda.empty_cache()
-			#if i > 1:
-			#	continue
-			# 1. Convert the batch_x from wordpiece ids into wordpieces
-			wordpieces_l = batch_to_wordpieces(batch_xl, wordpiece_vocab)
-			wordpieces_r = batch_to_wordpieces(batch_xr, wordpiece_vocab)
-			#wordpieces_a = batch_to_wordpieces(batch_xa, wordpiece_vocab)
-			wordpieces_m = batch_to_wordpieces(batch_xm, wordpiece_vocab)
+			# # 1. Convert the batch_x from wordpiece ids into bert embedding vectors
 
-			# 2. Encode the wordpieces into Bert vectors
-			bert_embs_l  = wordpieces_to_bert_embs(wordpieces_l, bc).to(device)
-			bert_embs_r  = wordpieces_to_bert_embs(wordpieces_r, bc).to(device)				
-			#bert_embs_a  = wordpieces_to_bert_embs(wordpieces_a, bc).to(device)
-			bert_embs_m  = wordpieces_to_bert_embs(wordpieces_m, bc).to(device)
+			bert_embs_l = bc.encode(batch_xl, frozen=True)					
+			bert_embs_r = bc.encode(batch_xr, frozen=True)		
+			bert_embs_m = bc.encode(batch_xm, frozen=True)		
+			
+			batch_y = batch_y.float().to(device)	
 
-			batch_y = batch_y.float().to(device)
-
-			# 3. Feed these Bert vectors to our model
+			# 2. Feed these Bert vectors to our model
 			model.zero_grad()
 			model.train()
 
-			y_hat = model(bert_embs_l, bert_embs_r, None, bert_embs_m)				
+			y_hat = model(bert_embs_l, bert_embs_r, None, bert_embs_m)
 
-			loss = model.calculate_loss(y_hat, batch_y) 
-			writer.add_scalar("Loss/train", loss, epoch)
+			loss = model.calculate_loss(y_hat, batch_y)
 
-			
-			for j, row in enumerate(batch_y):
-				labels = hierarchy.onehot2categories(batch_y[j])
-				with open(here / "predictions" /model.dataset/ "bilstm_batch_y", "a") as out:
-					print(labels, file=out)
-					print(batch_y[j], file=out)
-
-
-			# 4. Backpropagate
-			# loss.backward() computes dloss/dx for every parameter x which has requires_grad = True. x.grad += dloss/dx
-			# optimizer.step updates the value of x using the gradient x.grad.			
+			# 3. Backpropagate
 			loss.backward()
 			optimizer.step()
 			epoch_losses.append(loss)
 
-			# 5. Draw the progress bar
-			progress_bar.draw_bar(i, epoch, epoch_start_time)	
+			# 4. Draw the progress bar
+			progress_bar.draw_bar(i, epoch, epoch_start_time)
+			
 
 		avg_loss = sum(epoch_losses) / float(len(epoch_losses))
 		avg_loss_list.append(avg_loss)

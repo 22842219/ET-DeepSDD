@@ -16,9 +16,7 @@ from load_config import load_config, device
 from pathlib import Path
 here = Path(__file__).parent
 
-
-# from compute_mpe import CircuitMPE
-
+from compute_mpe import CircuitMPE
 
 torch.manual_seed(123)
 torch.backends.cudnn.deterministic=True

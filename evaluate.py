@@ -1,17 +1,15 @@
-import data_utils as dutils
-from load_config import load_config, device
-cf = load_config()
-from logger import logger
-import torch, json, sys
-from data_utils import batch_to_wordpieces, wordpieces_to_bert_embs, build_token_to_wp_mapping, load_embeddings
+import torch
+import json, sys, random, re, matplotlib
 from sklearn.metrics import f1_score, classification_report, accuracy_score
 from colorama import Fore, Back, Style
-import random
+
+from logger import logger
 import nfgec_evaluate 
-import re
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+import data_utils as dutils
+from data_utils import batch_to_wordpieces, build_token_to_wp_mapping, load_embeddings
+from load_config import load_config, device
+cf = load_config()
+
 
 from pathlib import Path
 here = Path(__file__).parent
@@ -33,13 +31,16 @@ class ModelEvaluator():
 		self.hierarchy = hierarchy
 		self.bc = bc
 		self.mode = mode
-
 		self.best_f1_and_epoch = [0.0, -1]
 
 
-
 	# Evaluate a given model via F1 score over the entire test corpus.
-	def evaluate_model(self, epoch):
+	def evaluate_model(self, epoch):		
+		if cf.EMBEDDING_MODEL == "bert":
+			bc =  get_contextualizer("bert-base-cased", device='cuda:0')
+		else:
+			bc = None
+
 		self.model.zero_grad()
 		self.model.eval()	
 		all_tys   = None
@@ -70,45 +71,28 @@ class ModelEvaluator():
 			batch_true_and_predictions = []
 			entities = []
 			
-			# 1. Convert the batch_x from wordpiece ids into wordpieces
-			wordpieces_l = batch_to_wordpieces(batch_xl, self.wordpiece_vocab)
-			wordpieces_r = batch_to_wordpieces(batch_xr, self.wordpiece_vocab)
-			wordpieces_a = batch_to_wordpieces(batch_xa, self.wordpiece_vocab)
-			wordpieces_m = batch_to_wordpieces(batch_xm, self.wordpiece_vocab)
-
-
-			# 2. Encode the wordpieces into Bert vectors
-			bert_embs_l  = wordpieces_to_bert_embs(wordpieces_l, self.bc).to(device)
-			bert_embs_r  = wordpieces_to_bert_embs(wordpieces_r, self.bc).to(device)				
-			#bert_embs_a  = wordpieces_to_bert_embs(wordpieces_a, self.bc).to(device)
-			bert_embs_m  = wordpieces_to_bert_embs(wordpieces_m, self.bc).to(device)
-
+			
+			# Convert the batch_x from wordpiece ids into pretrained bert embedding
+			bert_embs_l = self.bc.encode(batch_xl, frozen=True)	
+			bert_embs_r = self.bc.encode(batch_xr, frozen=True)		
+			bert_embs_m = self.bc.encode(batch_xm, frozen=True)			
 							
 			mention_preds = self.model.evaluate(bert_embs_l, bert_embs_r, None, bert_embs_m)
-
 			batch_y = batch_y.float().to(device)
 
-			for j, row in enumerate(batch_y):
-
-				
+			for j, row in enumerate(batch_y):				
 
 				labels = self.hierarchy.onehot2categories(batch_y[j])
 				preds = self.hierarchy.onehot2categories(mention_preds[j])	
 
 				if labels not in labels_set:
 					labels_set.append(labels)
-
-
 				true_and_prediction.append((labels, preds))
 				batch_true_and_predictions.append((labels, preds))
-
 				every_entity_mention = ' '.join(wordpieces_m[j])
 				every_entity_mention = re.sub("'", "", every_entity_mention)
-				# print("every_entity_mention:",every_entity_mention)
 				entities.append(every_entity_mention)
 
-				# every_entity_mention_sent = ' '.join(wordpieces_a[j])
-				# every_entity_mention_sent = re.sub("'", "", every_entity_mention_sent)
 
 			s = ""		
 			for i, every_tuple in enumerate(batch_true_and_predictions):
@@ -217,10 +201,10 @@ def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wor
 
 def evaluate_without_loading(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
 	from model import E2EETModel, MentionLevelModel
-	from bert_serving.client import BertClient
+	from bert_encoder import  get_contextualizer
 	import jsonlines
 	
-	bc = BertClient()
+	bc = get_contextualizer("bert-base-cased", device='cuda:0')
 	logger.info("Loading files...")	
 	logger.info("Building model.")
 	model = create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces)	
@@ -236,13 +220,10 @@ def evaluate_without_loading(data_loaders, word_vocab, wordpiece_vocab, hierarch
 def main():
 
 	from model import  MentionLevelModel
-
-	from bert_serving.client import BertClient
+	from bert_encoder import  get_contextualizer
 	import jsonlines	
-	bc = BertClient()
+	bc = get_contextualizer("bert-base-cased", device='cuda:0')	
 
-
-	
 	logger.info("Loading files...")
 	data_loaders = dutils.load_obj_from_pkl_file('data loaders', cf.ASSET_FOLDER + '/data_loaders.pkl')
 	word_vocab = dutils.load_obj_from_pkl_file('word vocab', cf.ASSET_FOLDER + '/word_vocab.pkl')
