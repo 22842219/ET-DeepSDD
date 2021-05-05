@@ -7,7 +7,7 @@ from torch.optim.adamw import AdamW
 
 from progress_bar import ProgressBar
 import data_utils as dutils
-from data_utils import Vocab, CategoryHierarchy, EntityTypingDataset, batch_to_wordpieces, load_embeddings
+from data_utils import Vocab, CategoryHierarchy, EntityTypingDataset, batch_to_wordpieces
 from logger import logger
 from model import MentionLevelModel
 from bert_encoder import  get_contextualizer

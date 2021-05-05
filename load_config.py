@@ -59,15 +59,15 @@ class Config():
 
 		self.MODEL_OPTIONS = cf['model_options']
 
-		self.TRAIN_FILENAME = check_filename_exists("data/datasets/%s/train.json" % cf['dataset'])
-		self.DEV_FILENAME  = check_filename_exists("data/datasets/%s/dev.json" % cf['dataset'])
-		self.TEST_FILENAME  = check_filename_exists("data/datasets/%s/test.json" % cf['dataset'])
+		self.TRAIN_FILENAME = check_filename_exists("data/%s/train.json" % cf['dataset'])
+		self.DEV_FILENAME  = check_filename_exists("data/%s/dev.json" % cf['dataset'])
+		self.TEST_FILENAME  = check_filename_exists("data/%s/test.json" % cf['dataset'])
 
-		self.FILTERED_TRAIN_FOLDER = initialise_folder("data/datasets/%s_filtered" % cf['dataset'], "filtered dataset")
+		self.FILTERED_TRAIN_FOLDER = initialise_folder("data/%s_filtered" % cf['dataset'], "filtered dataset")
 		self.FILTERED_TRAIN_VEC_FILENAME = self.FILTERED_TRAIN_FOLDER + "/train.vec"
 		self.FILTERED_TRAIN_FILENAME = self.FILTERED_TRAIN_FOLDER + "/train.json"
 
-		self.FILTERED_HIERARCHY_TRAIN_FOLDER = initialise_folder("data/datasets/%s_filtered_(hierarchy)" % cf['dataset'], "filtered dataset")
+		self.FILTERED_HIERARCHY_TRAIN_FOLDER = initialise_folder("data/%s_filtered_(hierarchy)" % cf['dataset'], "filtered dataset")
 		self.FILTERED_HIERARCHY_TRAIN_FILENAME = self.FILTERED_HIERARCHY_TRAIN_FOLDER + "/train.json"
 
 		self.MODEL_FOLDER 			= initialise_folder("models/%s_%s" % (cf['model'], options_to_text(self.MODEL_OPTIONS)), "model")

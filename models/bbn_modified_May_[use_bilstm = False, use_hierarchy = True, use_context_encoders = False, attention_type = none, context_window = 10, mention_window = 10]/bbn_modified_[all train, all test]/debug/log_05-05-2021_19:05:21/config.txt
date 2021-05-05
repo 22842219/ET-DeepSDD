@@ -1,0 +1,30 @@
+Config at 05-05-2021_19:05:21
+================================================================================
+ASSET_FOLDER: models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/asset
+BATCH_SIZE: 100
+BEST_MODEL_FILENAME: models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/best_model/model
+BEST_MODEL_FOLDER: models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/best_model
+BEST_MODEL_JSON_FILENAME: models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/best_model/model.json
+DATASET: bbn_modified
+DEBUG_FOLDER: models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/debug
+DEV_FILENAME: data/bbn_modified/dev.json
+EMBEDDING_DIM: 768
+EMBEDDING_MODEL: bert
+FILTERED_HIERARCHY_TRAIN_FILENAME: data/bbn_modified_filtered_(hierarchy)/train.json
+FILTERED_HIERARCHY_TRAIN_FOLDER: data/bbn_modified_filtered_(hierarchy)
+FILTERED_TRAIN_FILENAME: data/bbn_modified_filtered/train.json
+FILTERED_TRAIN_FOLDER: data/bbn_modified_filtered
+FILTERED_TRAIN_VEC_FILENAME: data/bbn_modified_filtered/train.vec
+HIDDEN_DIM: 768
+LEARNING_RATE: 0.0001
+MAX_EPOCHS: 2000
+MAX_SENTS: {'train': 'all', 'test': 'all', 'dev': 'all'}
+MAX_SENT_LEN: 100
+MODEL: bbn_modified_May
+MODEL_DATASET_FOLDER: models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]
+MODEL_FOLDER: models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]
+MODEL_OPTIONS: {'use_bilstm': False, 'use_hierarchy': True, 'use_context_encoders': False, 'attention_type': 'none', 'context_window': 10, 'mention_window': 10}
+STOP_CONDITION: 3
+TASK: mention_level
+TEST_FILENAME: data/bbn_modified/test.json
+TRAIN_FILENAME: data/bbn_modified/train.json

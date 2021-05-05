@@ -1,0 +1,39 @@
+05-05-2021 19:05:21 DEBUG   Dumped config to models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/debug/log_05-05-2021_19:05:21/config.txt.
+05-05-2021 19:05:21 DEBUG   Dumped config to models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/debug/config.txt.
+05-05-2021 19:05:21 DEBUG   $HOME=/home/ziyu
+05-05-2021 19:05:21 DEBUG   matplotlib data path /usr/local/lib/python3.6/site-packages/matplotlib/mpl-data
+05-05-2021 19:05:21 DEBUG   loaded rc file %s
+05-05-2021 19:05:21 DEBUG   matplotlib version %s
+05-05-2021 19:05:21 DEBUG   interactive is %s
+05-05-2021 19:05:21 DEBUG   platform is %s
+05-05-2021 19:05:21 DEBUG   loaded modules: %s
+05-05-2021 19:05:32 INFO    Building category hierarchy.
+05-05-2021 19:05:35 INFO    Hierarchy contains 48 categories total. [47 train, 37 test]
+05-05-2021 19:05:35 INFO    1 categories are unique to the test dataset.
+05-05-2021 19:05:35 INFO    36 categories are present in both train and test datasets.
+05-05-2021 19:05:35 INFO    Category hierarchy contains 48 categories.
+05-05-2021 19:05:35 INFO    Hierarchy contains 1 categories unique to the test set.
+05-05-2021 19:05:35 INFO    Loading train dataset from data/bbn_modified/train.json.
+05-05-2021 19:06:01 WARNING 427 of 11023 mentions in the train dataset were trimmed due to exceeding the mention_window of 10 after wordpiece tokenization.
+05-05-2021 19:06:01 INFO    Building data loader...
+05-05-2021 19:06:01 INFO    The train dataset was built successfully.
+05-05-2021 19:06:01 INFO    Dataset contains 1117852 wordpieces (including overly long sentences).
+05-05-2021 19:06:01 INFO    Loading dev dataset from data/bbn_modified/dev.json.
+05-05-2021 19:06:05 WARNING 57 of 1395 mentions in the dev dataset were trimmed due to exceeding the mention_window of 10 after wordpiece tokenization.
+05-05-2021 19:06:05 INFO    Building data loader...
+05-05-2021 19:06:05 INFO    The dev dataset was built successfully.
+05-05-2021 19:06:05 INFO    Dataset contains 139500 wordpieces (including overly long sentences).
+05-05-2021 19:06:05 INFO    Loading test dataset from data/bbn_modified/test.json.
+05-05-2021 19:06:08 WARNING 66 of 1348 mentions in the test dataset were trimmed due to exceeding the mention_window of 10 after wordpiece tokenization.
+05-05-2021 19:06:08 INFO    Building data loader...
+05-05-2021 19:06:08 INFO    The test dataset was built successfully.
+05-05-2021 19:06:08 INFO    Dataset contains 134800 wordpieces (including overly long sentences).
+05-05-2021 19:06:08 INFO    Saving data loaders to file...
+05-05-2021 19:06:08 INFO    Saved data loaders to models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/asset/data_loaders.pkl.
+05-05-2021 19:06:08 INFO    Saving vocabs and hierarchy to file...
+05-05-2021 19:06:08 INFO    Saved word vocab to models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/asset/word_vocab.pkl.
+05-05-2021 19:06:08 INFO    Saved wordpiece vocab to models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/asset/wordpiece_vocab.pkl.
+05-05-2021 19:06:08 INFO    Saved hierarchy to models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/asset/hierarchy.pkl.
+05-05-2021 19:06:08 INFO    Saved total_wordpieces to models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/asset/total_wordpieces.pkl.
+05-05-2021 19:06:08 DEBUG   Saved word vocab to models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/debug/word_vocab.txt.
+05-05-2021 19:06:08 DEBUG   Saved wordpiece vocab to models/bbn_modified_May_[use_bilstm = False, use_hierarchy = True, use_context_encoders = False, attention_type = none, context_window = 10, mention_window = 10]/bbn_modified_[all train, all test]/debug/wordpiece_vocab.txt.
