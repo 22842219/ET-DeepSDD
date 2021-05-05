@@ -6,7 +6,7 @@ pysdd package is downloaded from https://github.com/wannesm/PySDD
 
 # Setup 
 
-This repository uses [pysdd](#https://github.com/wannesm/PySDD) to convert logical formula, and 
+This repository uses [pysdd](https://github.com/wannesm/PySDD) to convert logical formula, and use [hugging_face pre-trained bert model](https://huggingface.co/transformers/model_doc/bert.html) to convert tokens into embeded vectors.
 Firstly, construct sdd tree based on customized logical formula.
 
 ```
