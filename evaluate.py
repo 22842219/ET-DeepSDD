@@ -5,6 +5,7 @@ from colorama import Fore, Back, Style
 
 from logger import logger
 import nfgec_evaluate 
+from bert_encoder import  get_contextualizer
 import data_utils as dutils
 from data_utils import batch_to_wordpieces, build_token_to_wp_mapping
 from load_config import load_config, device

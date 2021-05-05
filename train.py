@@ -93,7 +93,6 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
 	model = MentionLevelModel(	embedding_dim = cf.EMBEDDING_DIM,
 						hidden_dim = cf.HIDDEN_DIM,
-
 						vocab_size = len(wordpiece_vocab),
 						label_size = len(hierarchy),
 						dataset = cf.DATASET,

@@ -22,9 +22,10 @@ torch.manual_seed(123)
 torch.backends.cudnn.deterministic=True
 
 class MentionLevelModel(nn.Module):
-	def __init__(self, embedding_dim, hidden_dim, vocab_size, label_size, model_options, total_wordpieces, category_counts, hierarchy_matrix, context_window, mention_window, attention_type, use_context_encoders):
+	def __init__(self, dataset, embedding_dim, hidden_dim, vocab_size, label_size, model_options, total_wordpieces, category_counts, hierarchy_matrix, context_window, mention_window, attention_type, use_context_encoders):
 		super(MentionLevelModel, self).__init__()
 
+		self.dataset = dataset
 		self.embedding_dim = embedding_dim
 		self.hidden_dim = hidden_dim
 		self.vocab_size = vocab_size
