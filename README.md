@@ -4,6 +4,9 @@ A CUDA-enabled PyTorch and pysdd implemention for ET-DeepSDD: "An Efficient Neur
 
 pysdd package is downloaded from https://github.com/wannesm/PySDD
 
+# Setup 
+
+This repository uses [pysdd](#https://github.com/wannesm/PySDD) to convert logical formula, and 
 Firstly, construct sdd tree based on customized logical formula.
 
 ```
@@ -14,12 +17,10 @@ Secondly, build the data loader.
 
 ```
 python biuld_data.py
-
 ```
 
 Then, train the model.
 
 ```
 python train.py
-
 ```
