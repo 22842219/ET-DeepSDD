@@ -14,10 +14,12 @@ Secondly, build the data loader.
 
 ```
 python biuld_data.py
+
 ```
 
 Then, train the model.
 
-``
+```
 python train.py
+
 ```
