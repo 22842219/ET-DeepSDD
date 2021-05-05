@@ -6,3 +6,6 @@ pysdd package is downloaded from https://github.com/wannesm/PySDD
 
 
 
+```
+python sdd.py --dataset bbn_modified --label_size 48
+```
