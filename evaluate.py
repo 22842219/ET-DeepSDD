@@ -71,8 +71,7 @@ class ModelEvaluator():
 			
 			batch_true_and_predictions = []
 			entities = []
-			
-			
+		
 			# Convert the batch_x from wordpiece ids into pretrained bert embedding
 			bert_embs_l = self.bc.encode(batch_xl, frozen=True)	
 			bert_embs_r = self.bc.encode(batch_xr, frozen=True)		
@@ -90,7 +89,7 @@ class ModelEvaluator():
 					labels_set.append(labels)
 				true_and_prediction.append((labels, preds))
 				batch_true_and_predictions.append((labels, preds))
-				every_entity_mention = ' '.join(wordpieces_m[j])
+				every_entity_mention = ' '.join(batch_to_wordpieces(batch_xm, self.wordpiece_vocab)[j])
 				every_entity_mention = re.sub("'", "", every_entity_mention)
 				entities.append(every_entity_mention)
 
