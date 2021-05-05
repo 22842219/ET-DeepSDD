@@ -1,37 +1,166 @@
+from typing import *
 import torch
-import torch.nn as nn
-from transformers import BertTokenizer, BertModel
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+from abc import abstractmethod
+import transformers
 
-class BertEncoder(nn.Module):
-    def __init__(self, language='en', use_finetune=False):
+class Contextualizer:
+    """
+    Wraps around any contextualizer with optional subword tokenization.
+    This abstracts over the following 3 cases:
+      - BERT et al. (subword-based).
+    These are encapsulated in the following 3 steps, as represented
+    by the 3 abstract methods.
+    """
 
-        super(BertEncoder, self).__init__()
-
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-        self.model = BertModel.from_pretrained('bert-base-cased').to(device)
-        
-        self.use_finetune = use_finetune
-    
-    def get_tokenizer(self):
-        return self.tokenizer
-    
-    def forward(self, dataset):
+    @abstractmethod
+    def tokenize_with_mapping(self,
+                              sentence: List[str]
+                              ) -> Tuple[Union[List[int], List[str]], List[int]]:
         """
-        dataset: The datasets object itself is DatasetDict, which contains one key for the training, validation and test set.
-        tokenized_input ={input_ids, token_type_ids, attention_mask}    
+        Given a sentence tokenized into words,
+        tokenizes it into subword units,
+        optionally index (ELMo does not do this) these subword units into IDs,
+        and returns a mapping of the tokenized symbols and the original token indices.
+        :param sentence: List of original tokens
+        :param lang: Language ID
+        :return: (subword token indices, index mapping)
         """
-        tokenized_input = self.tokenizer(dataset["tokens"],
-                                         is_split_into_words=True, 
-                                         padding=True, 
-                                         truncation=True, 
-                                         max_length=100, 
-                                         return_tensors="pt").to(device)
-        #The first element is the hidden state of the last layer of the Bert model
-        if self.use_finetune:
-            encoded_layers = self.model()[0]
+        raise NotImplementedError
+
+    @abstractmethod
+    def encode(self,
+               sentences: List[Union[List[int], List[str]]],
+               frozen: bool = True
+               ) -> torch.Tensor:  # R[Batch, Emb]
+        """
+        Encodes these sentences, with their optional language IDs
+        :param sentences:
+        :param frozen: Whether the encoder is frozen
+        :return:
+        """
+        raise NotImplementedError
+
+class HuggingFaceContextualizer(Contextualizer):
+    """
+    Wraps around any contextualizer in the HuggingFace Transformers package.
+    """
+
+    def __init__(self,
+                 hf_tokenizer: transformers.PreTrainedTokenizer,
+                 hf_model: transformers.PreTrainedModel,
+                 device: str
+                 ):
+        self.hf_tokenizer = hf_tokenizer
+        self.hf_model = hf_model
+        self.device = device
+
+    @abstractmethod
+    def postprocess_mapping(self,
+                            mapping: List[int]
+                            ) -> List[int]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def select_output(self, output: Any) -> torch.Tensor:
+        raise NotImplementedError
+
+    def tokenize_with_mapping(self,
+                              sentence: List[str]
+                              ) -> Tuple[Union[List[int]], List[int]]:
+        tokens = []
+        mapping = []
+        for i, t in enumerate(sentence):
+            for wp in self.hf_tokenizer.tokenize(t):
+                tokens.append(wp)
+                mapping.append(i)
+
+        token_indices = self.hf_tokenizer.convert_tokens_to_ids(tokens)
+        token_indices_with_special_symbols = self.hf_tokenizer.build_inputs_with_special_tokens(token_indices)
+        mapping_with_special_symbols = self.postprocess_mapping(mapping)
+
+        return token_indices_with_special_symbols, mapping_with_special_symbols
+
+    def encode(self,
+               indexed_sentences: List[List[int]],
+               frozen: bool = True,
+               ) -> torch.Tensor:  # R[Batch, Emb]
+
+        bsz = len(indexed_sentences)
+        lengths = [len(s) for s in indexed_sentences]
+        indices_tensor = torch.zeros(bsz, max(lengths), dtype=torch.int64)
+        input_mask = torch.zeros(bsz, max(lengths), dtype=torch.int64)
+
+        for i in range(bsz):
+            for j in range(lengths[i]):
+                indices_tensor[i, j] = indexed_sentences[i][j]
+                input_mask[i, j] = 1
+
+        indices_tensor = indices_tensor.to(device=self.device)
+        input_mask = input_mask.to(device=self.device)
+
+        if frozen:
+            self.hf_model.eval()
         else:
-            with torch.no_grad():
-                encoded_layers = self.model(**tokenized_input)[0]  
+            self.hf_model.train()
 
-        return encoded_layers
+        with torch.no_grad() if frozen else torch.enable_grad():
+            model_output = self.hf_model(
+                input_ids=indices_tensor,
+                attention_mask=input_mask
+            )
+            embs = self.select_output(model_output)
+            return embs
+
+class BERTContextualizer(HuggingFaceContextualizer):
+
+    def __init__(self,
+                 hf_tokenizer: transformers.BertTokenizer,
+                 hf_model: transformers.BertModel,
+                 device: str
+                 ):
+        super(BERTContextualizer, self).__init__(hf_tokenizer, hf_model, device)
+
+    @classmethod
+    def from_model(cls, model_name: str, device: str, tokenizer_only: bool = False):
+        hf_tokenizer = transformers.BertTokenizer.from_pretrained(model_name)
+        hf_model = None if tokenizer_only \
+            else transformers.BertModel.from_pretrained(model_name, output_hidden_states=True)
+        if not tokenizer_only and device != "cpu":
+            hf_model.cuda(device=device)
+        return cls(
+            hf_tokenizer=hf_tokenizer,
+            hf_model=hf_model,
+            device=device
+        )
+
+    def postprocess_mapping(self, mapping: List[int]) -> List[int]:
+        # account for [CLS] and [SEP]
+        return [-1] + mapping + [max(mapping) + 1]
+
+    def select_output(self, output: Any) -> torch.Tensor:
+        '''
+        : Returen
+          -pooler_output 
+           torch.FloatTensor of shape (batch_size, hidden_size)) 
+            – Last layer hidden-state of the first token of the sequence (classification token) 
+              further processed by a Linear layer and a Tanh activation function. 
+
+        '''
+        encoded = output.pooler_output  # R[Batch, Emb]  
+        return encoded
+
+
+
+def get_contextualizer(
+        model_name: str,
+        device: str,
+        tokenizer_only: bool = False
+) -> Contextualizer:
+    """
+    Returns a contextualizer by pre-trained model name.
+    :param model_name: Model identifier.
+    :param device:
+    :param tokenizer_only: if True, only loads tokenizer (not actual model)
+    """
+    if model_name.startswith("bert"):
+        return BERTContextualizer.from_model(model_name, device, tokenizer_only = tokenizer_only)
