@@ -30,12 +30,14 @@ class Sentence(object):
 				word_vocab, 
 				wordpiece_vocab,
 				wordpieces, 
+				token_indexes,
 				wordpiece_indexes, 
 				token_idxs_to_wp_idxs, 
 				build_labels=True):
 	
 		self.tokens = tokens[:]
 		self.labels = labels[:]
+		self.token_indexes = token_indexes
 
 		# The build_labels variable is set to False when constructing sentences from the testing set (I think!)
 		if build_labels:
@@ -126,7 +128,7 @@ class Sentence(object):
 # It is a subclass of the Sentence class.
 class Mention(Sentence):
 	def __init__(self, tokens, labels,  word_vocab, wordpiece_vocab, wordpieces, token_indexes, wordpiece_indexes, token_idxs_to_wp_idxs, start, end):
-		super(Mention, self).__init__(tokens,labels, word_vocab, wordpiece_vocab,wordpieces,wordpiece_indexes, token_idxs_to_wp_idxs,build_labels = False)
+		super(Mention, self).__init__(tokens,labels, word_vocab, wordpiece_vocab,wordpieces,token_indexes, wordpiece_indexes, token_idxs_to_wp_idxs,build_labels = False)
 		
 		self.tokens = tokens			
 		self.labels = labels
