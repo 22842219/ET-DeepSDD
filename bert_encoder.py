@@ -26,12 +26,14 @@ class Contextualizer:
         :return: (subword token indices, index mapping)
         """
         raise NotImplementedError
+    def get_tokenizer(self):
+        raise NotImplementedError
 
     @abstractmethod
     def encode(self,
                sentences: List[Union[List[int], List[str]]],
                frozen: bool = True
-               ) -> torch.Tensor:  # R[Batch, Emb]
+               ) -> torch.Tensor:  # R[Batch, Layer, Word, Emb]
         """
         Encodes these sentences, with their optional language IDs
         :param sentences:
@@ -78,12 +80,12 @@ class HuggingFaceContextualizer(Contextualizer):
         token_indices_with_special_symbols = self.hf_tokenizer.build_inputs_with_special_tokens(token_indices)
         mapping_with_special_symbols = self.postprocess_mapping(mapping)
 
-        return token_indices_with_special_symbols, mapping_with_special_symbols
+        return token_indices, token_indices_with_special_symbols, mapping_with_special_symbols
 
     def encode(self,
                indexed_sentences: List[List[int]],
                frozen: bool = True,
-               ) -> torch.Tensor:  # R[Batch, Emb]
+               ) -> torch.Tensor:  # R[Batch, Layer, Length, Emb]
 
         bsz = len(indexed_sentences)
         lengths = [len(s) for s in indexed_sentences]
@@ -114,15 +116,16 @@ class HuggingFaceContextualizer(Contextualizer):
 class BERTContextualizer(HuggingFaceContextualizer):
 
     def __init__(self,
-                 hf_tokenizer: transformers.BertTokenizer,
+                 hf_tokenizer: transformers.BertTokenizerFast,
                  hf_model: transformers.BertModel,
                  device: str
                  ):
         super(BERTContextualizer, self).__init__(hf_tokenizer, hf_model, device)
 
+
     @classmethod
     def from_model(cls, model_name: str, device: str, tokenizer_only: bool = False):
-        hf_tokenizer = transformers.BertTokenizer.from_pretrained(model_name)
+        hf_tokenizer = transformers.BertTokenizerFast.from_pretrained(model_name)
         hf_model = None if tokenizer_only \
             else transformers.BertModel.from_pretrained(model_name, output_hidden_states=True)
         if not tokenizer_only and device != "cpu":
@@ -133,21 +136,18 @@ class BERTContextualizer(HuggingFaceContextualizer):
             device=device
         )
 
+    def get_tokenizer(self):
+        return self.hf_tokenizer
+
     def postprocess_mapping(self, mapping: List[int]) -> List[int]:
         # account for [CLS] and [SEP]
         return [-1] + mapping + [max(mapping) + 1]
 
     def select_output(self, output: Any) -> torch.Tensor:
-        '''
-        : Returen
-          -pooler_output 
-           torch.FloatTensor of shape (batch_size, hidden_size)) 
-            – Last layer hidden-state of the first token of the sequence (classification token) 
-              further processed by a Linear layer and a Tanh activation function. 
-
-        '''
-        encoded = output.pooler_output  # R[Batch, Emb]  
+        encoded = output.pooler_output  # List_Layer[R[Batch, Word, Emb]]
+        # stacked = torch.stack(encoded, dim=1)  # R[Batch, Layer, Word, Emb]
         return encoded
+
 
 
 
