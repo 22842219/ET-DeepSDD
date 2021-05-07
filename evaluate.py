@@ -216,8 +216,6 @@ def main():
 	from model import  MentionLevelModel
 	from bert_encoder import  get_contextualizer
 	import jsonlines	
-	bc = get_contextualizer("bert-base-cased", device='cuda:0')	
-
 	logger.info("Loading files...")
 	data_loaders = dutils.load_obj_from_pkl_file('data loaders', cf.ASSET_FOLDER + '/data_loaders.pkl')
 	word_vocab = dutils.load_obj_from_pkl_file('word vocab', cf.ASSET_FOLDER + '/word_vocab.pkl')
@@ -231,7 +229,7 @@ def main():
 	model.load_state_dict(torch.load(cf.BEST_MODEL_FILENAME))
 
 
-	modelEvaluator = ModelEvaluator(model, data_loaders['test'], word_vocab, wordpiece_vocab, hierarchy, bc, mode="test")	
+	modelEvaluator = ModelEvaluator(model, data_loaders['test'], word_vocab, wordpiece_vocab, hierarchy, mode="test")	
 	with jsonlines.open(cf.BEST_MODEL_JSON_FILENAME, "r") as reader:
 		for line in reader:
 			f1_score, epoch = line['f1_score'], line['epoch']
