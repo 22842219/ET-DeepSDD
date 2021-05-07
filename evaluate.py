@@ -24,13 +24,12 @@ torch.backends.cudnn.deterministic=True
 
 class ModelEvaluator():
 
-	def __init__(self, model, data_loader, word_vocab, wordpiece_vocab, hierarchy, bc, mode="train"):
+	def __init__(self, model, data_loader, word_vocab, wordpiece_vocab, hierarchy, mode="train"):
 		self.model = model 
 		self.data_loader = data_loader 
 		self.word_vocab = word_vocab 
 		self.wordpiece_vocab = wordpiece_vocab
 		self.hierarchy = hierarchy
-		self.bc = bc
 		self.mode = mode
 		self.best_f1_and_epoch = [0.0, -1]
 
@@ -38,9 +37,9 @@ class ModelEvaluator():
 	# Evaluate a given model via F1 score over the entire test corpus.
 	def evaluate_model(self, epoch):		
 		if cf.EMBEDDING_MODEL == "bert":
-			bc =  get_contextualizer("bert-base-cased", device='cuda:0')
+			self.bc =  get_contextualizer("bert-base-cased", device='cuda:0')
 		else:
-			bc = None
+			self.bc = None
 
 		self.model.zero_grad()
 		self.model.eval()	

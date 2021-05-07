@@ -34,7 +34,7 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 	logger.info("Training model.")
 
 
-	modelEvaluator = ModelEvaluator(model, data_loaders['dev'], word_vocab, wordpiece_vocab, hierarchy, bc)
+	modelEvaluator = ModelEvaluator(model, data_loaders['dev'], word_vocab, wordpiece_vocab, hierarchy)
 	
 	optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=cf.LEARNING_RATE)
 
