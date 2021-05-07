@@ -6,7 +6,7 @@ import pickle as pkl
 import codecs, jsonlines
 from logger import logger
 import data_utils as dutils
-from data_utils import Vocab, CategoryHierarchy, EntityTypingDataset, MentionTypingDataset, tokens_to_wordpieces
+from data_utils import Vocab, CategoryHierarchy, EntityTypingDataset, MentionTypingDataset
 
 from load_config import load_config
 cf = load_config()
@@ -15,7 +15,6 @@ from train import train_without_loading
 from evaluate import evaluate_without_loading
 
 from bert_encoder import  get_contextualizer
-# from transformers import BertTokenizerFast
 
 torch.manual_seed(123)
 torch.backends.cudnn.deterministic=True
@@ -30,14 +29,12 @@ class Sentence(object):
 				word_vocab, 
 				wordpiece_vocab,
 				wordpieces, 
-				token_indexes,
 				wordpiece_indexes, 
 				token_idxs_to_wp_idxs, 
 				build_labels=True):
 	
 		self.tokens = tokens[:]
 		self.labels = labels[:]
-		self.token_indexes = token_indexes
 
 		# The build_labels variable is set to False when constructing sentences from the testing set (I think!)
 		if build_labels:
@@ -61,7 +58,9 @@ class Sentence(object):
 		if build_labels:					
 			self.wordpiece_mentions = self.get_mentions_vector(self.wordpiece_labels)
 
-
+		self.pad_token_map()
+		self.pad_tokens()
+		self.pad_wordpieces()
 		# Add every word and wordpiece in this sentence to the Vocab object.
 		for word in self.tokens:
 			word_vocab.add_token(word)
@@ -71,17 +70,30 @@ class Sentence(object):
 		# wordpiece indexes.		
 		self.wordpiece_indexes = [wordpiece_vocab.token_to_ix[wordpiece] for wordpiece in self.wordpieces]
 
+	# Pad the wordpieces to MAX_SENT_LEN
+	def pad_wordpieces(self):
+		for x in range(MAX_SENT_LEN - len(self.wordpieces)):
+			self.wordpieces.append("[PAD]")
+
 	# Pad the wordpiece_labels to MAX_SENT_LEN
 	def pad_wordpiece_labels(self):
 		for x in range(MAX_SENT_LEN - len(self.wordpiece_labels)):
 			self.wordpiece_labels.append([0] * len(self.wordpiece_labels[0]))
 
+	# Pad the tokens to MAX_SENT_LEN
+	def pad_tokens(self):
+		for x in range(MAX_SENT_LEN - len(self.tokens)):
+			self.tokens.append("[PAD]")
 
 	# Pad the labels to MAX_SENT_LEN
 	def pad_labels(self):
 		for x in range(MAX_SENT_LEN - len(self.labels)):
 			self.labels.append([0] * len(self.labels[0]))
 
+	# Pad the token to wordpiece map to MAX_SENT_LEN
+	def pad_token_map(self):
+		for x in range(MAX_SENT_LEN - len(self.token_idxs_to_wp_idxs)):
+			self.token_idxs_to_wp_idxs.append(-1)
 
 	# Retrieve the wordpiece labels, which are the same as their corresponding tokens' labels.
 	# This is performed using the token_idxs_to_wp_idxs map.
@@ -90,8 +102,6 @@ class Sentence(object):
 		padding_labels = [0] * len(labels[0])
 		for i, idx in enumerate(token_idxs_to_wp_idxs):
 
-			#for ix in idx:
-			#	wordpiece_labels.append(labels[i])
 			if i == len(token_idxs_to_wp_idxs) - 1:
 				max_idx = len(wordpieces)
 			else:
@@ -128,7 +138,7 @@ class Sentence(object):
 # It is a subclass of the Sentence class.
 class Mention(Sentence):
 	def __init__(self, tokens, labels,  word_vocab, wordpiece_vocab, wordpieces, token_indexes, wordpiece_indexes, token_idxs_to_wp_idxs, start, end):
-		super(Mention, self).__init__(tokens,labels, word_vocab, wordpiece_vocab,wordpieces,token_indexes, wordpiece_indexes, token_idxs_to_wp_idxs,build_labels = False)
+		super(Mention, self).__init__(tokens,labels, word_vocab, wordpiece_vocab,wordpieces,wordpiece_indexes, token_idxs_to_wp_idxs,build_labels = False)
 		
 		self.tokens = tokens			
 		self.labels = labels
@@ -151,8 +161,8 @@ class Mention(Sentence):
 		start = self.mention_start
 		end = self.mention_end
 
-		ctx_left = self.wordpiece_indexes[max(0, start-maxlen):start]	
-		ctx_right = self.wordpiece_indexes[end:min(end+maxlen, len(self.wordpiece_indexes))]	
+		ctx_left = self.wordpiece_indexes[max(0, start-maxlen):start]
+		ctx_right = self.wordpiece_indexes[end:min(end+maxlen, len(self.wordpiece_indexes))]
 		ctx_mention = self.wordpiece_indexes[start:end]	
 		ctx_all = ctx_left + ctx_mention + ctx_right
 		
@@ -244,8 +254,10 @@ def build_dataset(filepath, hierarchy,  word_vocab, wordpiece_vocab, ds_name):
 	
 			for m in line['mentions']:
 				start = m['start']
-				end = m['end']	
-				labels = hierarchy.categories2onehot(m['labels'])	
+				end = m['end']
+				# print("mention:", line["tokens"][start:end])
+				labels = hierarchy.categories2onehot(m['labels'])
+				# print("labels:", len(labels),labels)
 				mention = Mention(tokens, labels,  word_vocab, wordpiece_vocab, wordpieces, token_indexes, wordpiece_indexes, token_idxs_to_wp_idxs, start, end)
 				mentions.append(mention)
 				if not mention.is_valid():						
@@ -273,7 +285,6 @@ def build_dataset(filepath, hierarchy,  word_vocab, wordpiece_vocab, ds_name):
 		data_xa.append(np.asarray(mention.wordpiece_indexes_all))
 		data_xm.append(np.asarray(mention.wordpiece_indexes_mention))
 		data_y.append(np.asarray(mention.labels))
-
 	
 	
 	dataset = MentionTypingDataset(data_xl, data_xr, data_xa, data_xm, data_y)

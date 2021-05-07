@@ -1,9 +1,9 @@
-
+import numpy as np
+import random
 import time, json, os
 import torch
 from torch.autograd import Variable
-from torch.optim.optimizer import Optimizer
-from torch.optim.adamw import AdamW
+import torch.optim as optim
 
 from progress_bar import ProgressBar
 import data_utils as dutils
@@ -22,27 +22,22 @@ here = Path(__file__).parent
 from torch.utils.tensorboard import SummaryWriter
 writer = writer = SummaryWriter('runs/ontonotes_modified/bilstm_emb300')
 
-torch.manual_seed(123)
-torch.backends.cudnn.deterministic=True
-
+# Ensure deterministic behavior
+torch.manual_seed(0xDEADBEEF)
+np.random.seed(0xDEADBEEF)
+random.seed(0xDEADBEEF)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 # Train the model, evaluating it every 10 epochs.
 def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_start = 1):
 	logger.info("Training model.")
 
-	# Set up a pre_trained bert model, for encoding the wordpieces
-	if cf.EMBEDDING_MODEL == "bert":
-		bc =  get_contextualizer("bert-base-cased", device='cuda:0')
-	else:
-		bc = None
 
 	modelEvaluator = ModelEvaluator(model, data_loaders['dev'], word_vocab, wordpiece_vocab, hierarchy, bc)
 	
-	optimizer = Optimizer.AdamW(
-        params=model.parameters(),
-        lr=cf.LEARNING_RATE,
-        weight_decay=0.1
-    )
+	optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=cf.LEARNING_RATE)
+
     
 	model.cuda()
 
@@ -57,20 +52,14 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 	for epoch in range(epoch_start, cf.MAX_EPOCHS + 1):
 		epoch_start_time = time.time()
 
-		for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(data_loaders["train"]):
-			# # 1. Convert the batch_x from wordpiece ids into bert embedding vectors
-
-			bert_embs_l = bc.encode(batch_xl, frozen=True)					
-			bert_embs_r = bc.encode(batch_xr, frozen=True)		
-			bert_embs_m = bc.encode(batch_xm, frozen=True)		
+		for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(data_loaders["train"]):	
 			
 			batch_y = batch_y.float().to(device)	
-
 			# 2. Feed these Bert vectors to our model
 			model.zero_grad()
 			model.train()
 
-			y_hat = model(bert_embs_l, bert_embs_r, None, bert_embs_m)
+			y_hat = model(batch_xl, batch_xr, batch_xa, batch_xm)
 
 			loss = model.calculate_loss(y_hat, batch_y)
 

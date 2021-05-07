@@ -31,24 +31,6 @@ def load_obj_from_pkl_file(obj_name, fname):
 		logger.info("Loaded %s from %s." % (obj_name, fname))		
 	return obj
 
-# Transforms a list of original tokens into a list of wordpieces using the Bert tokenizer.
-# Returns two lists:
-# - bert_tokens, the wordpieces corresponding to orig_tokens,
-# - orig_to_tok_map, which maps the indexes from orig_tokens to their positions in bert_tokens.
-#   for example, if orig_tokens = ["hi", "michael"], and bert_tokens is ["[CLS]", "hi", "mich", "##ael", "[SEP]"],
-#	then orig_to_tok_map becomes [1, 2].
-def tokens_to_wordpieces(orig_tokens):
-	bert_tokens = []
-	orig_to_tok_map = []
-	bert_tokens.append("[CLS]")
-	for orig_token in orig_tokens:
-		word_pieces = tokenizer.tokenize(orig_token)
-		orig_to_tok_map.append(len(bert_tokens))# + x for x in range(len(word_pieces))])
-		bert_tokens.extend(word_pieces)
-	bert_tokens.append("[SEP]")
-	return bert_tokens, orig_to_tok_map
-
-
 # An EntityTypingDataset, comprised of multiple Sentences.
 class EntityTypingDataset(Dataset):
 	def __init__(self, x, y, z, i, tx, ty, tm, ):

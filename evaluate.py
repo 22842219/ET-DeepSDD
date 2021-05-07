@@ -70,14 +70,9 @@ class ModelEvaluator():
 		for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(self.data_loader):
 			
 			batch_true_and_predictions = []
-			entities = []
-		
-			# Convert the batch_x from wordpiece ids into pretrained bert embedding
-			bert_embs_l = self.bc.encode(batch_xl, frozen=True)	
-			bert_embs_r = self.bc.encode(batch_xr, frozen=True)		
-			bert_embs_m = self.bc.encode(batch_xm, frozen=True)			
+			entities = []		
 							
-			mention_preds = self.model.evaluate(bert_embs_l, bert_embs_r, None, bert_embs_m)
+			mention_preds = self.model.evaluate(batch_xl, batch_xr, batch_xa, batch_xm)
 			batch_y = batch_y.float().to(device)
 
 			for j, row in enumerate(batch_y):				
