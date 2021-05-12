@@ -5,9 +5,8 @@ import torch
 import codecs, sys
 import numpy as np
 from load_config import device
-from transformers import BertTokenizer, BertModel
 
-tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+
 torch.manual_seed(123)
 torch.backends.cudnn.deterministic=True
 
@@ -30,6 +29,7 @@ def load_obj_from_pkl_file(obj_name, fname):
 		obj = pkl.load(f)
 		logger.info("Loaded %s from %s." % (obj_name, fname))		
 	return obj
+
 
 # An EntityTypingDataset, comprised of multiple Sentences.
 class EntityTypingDataset(Dataset):
@@ -181,33 +181,20 @@ class CategoryHierarchy():
 			raise Exception("Categories have not yet been frozen and sorted. Please call the freeze_categories() method first.")
 		return self.categories
 
-# A class to store the vocabulary, i.e. word_to_ix, wordpiece_to_ix, and their reverses ix_to_word and ix_to_wordpiece.
-# Can be used to quickly convert an index of a word/wordpiece to its corresponding term.
-class Vocab():
-	def __init__(self):
-		self.token_to_ix = {}
-		self.ix_to_token = []
-		self.add_token("[PAD]")
-
-	def add_token(self, token):
-		if token not in self.token_to_ix:
-			self.token_to_ix[token] = len(self.ix_to_token)
-			self.ix_to_token.append(token)
-
-	def __len__(self):
-		return len(self.token_to_ix)
-
 
 # Convert an entire batch to wordpieces using the vocab object.
-def batch_to_wordpieces(batch_x, vocab):
+def batch_to_wordpieces(batch_x, tokenizer):
 	wordpieces = []
 	padding_idx = vocab.token_to_ix["[PAD]"]
-	for sent in batch_x:
-		sent_wordpieces = [vocab.ix_to_token[x] for x in sent if x != padding_idx]
-		if sent_wordpieces == []:
-			sent_wordpieces = ['[PAD]'] # Allows BERT as a service to still embed it as zeros
-		wordpieces.append(sent_wordpieces)
+	for wp_ids in batch_x:
+		wp = tokenizer.convert_ids_to_tokens(wordpiece_ids)
+		wordpieces.append(wp)
 	return wordpieces
+
+
+
+def wordpieces_to_bert_embs(batch_x, bc):
+	return torch.from_numpy(bc.encode(batch_x, frozen=True))
 
 
 # Takes a token to wordpiece vector and modifies it as follows:
@@ -230,4 +217,36 @@ def build_token_to_wp_mapping(batch_tm):
 			token_idxs_to_wp_idxs[-1][i] = range(ls[i], m)
 
 	return token_idxs_to_wp_idxs
+
+# Load embeddings from file for Glove.
+# Some code in this function was found at https://github.com/guillaumegenthial/sequence_wtagging
+def load_embeddings(emb_model, word_vocab, embedding_dim):
+	if emb_model == "glove":
+		emb_file = 'glove/glove.6B.300d.txt'
+	elif emb_model == "word2vec":
+		#emb_file = 'word2vec/GoogleNews-vectors-negative300.txt'
+		emb_file = 'word2vec/enwiki_20180420_300d.txt'
+	else:
+		raise Exception("Embedding model not supported")
+		#with np.load(emb_file) as data:
+		#	embs = data["embeddings"]
+
+	print("Loading embeddings")
+	print(word_vocab.ix_to_token[0])
+	embeddings = np.zeros([len(word_vocab), embedding_dim])
+	with open(emb_file) as f:
+		for line in f:
+			line = line.strip().split(' ')
+			word = line[0]
+			embedding = [float(x) for x in line[1:]]
+			if word in word_vocab.token_to_ix:
+				word_idx = word_vocab.token_to_ix[word.lower()]
+				embeddings[word_idx] = np.asarray(embedding)
+
+	print("Found %d embeddings" % len(embeddings))
+
+	#for i, embedding in enumerate(embeddings):
+	#	print(word_vocab.ix_to_token[i], embedding[:5])
+	return embeddings
+	
 

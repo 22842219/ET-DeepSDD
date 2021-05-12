@@ -7,7 +7,7 @@ import torch.optim as optim
 
 from progress_bar import ProgressBar
 import data_utils as dutils
-from data_utils import Vocab, CategoryHierarchy, EntityTypingDataset, batch_to_wordpieces
+from data_utils import CategoryHierarchy, EntityTypingDataset
 from logger import logger
 from model import MentionLevelModel
 from bert_encoder import  get_contextualizer
@@ -15,32 +15,27 @@ from evaluate import ModelEvaluator
 from load_config import load_config, device
 cf = load_config()
 
-
 from pathlib import Path
 here = Path(__file__).parent
 
 from torch.utils.tensorboard import SummaryWriter
-writer = writer = SummaryWriter('runs/ontonotes_modified/bilstm_emb300')
+writer = writer = SummaryWriter('runs/bbn_modified')
 
-# Ensure deterministic behavior
 torch.manual_seed(0xDEADBEEF)
 np.random.seed(0xDEADBEEF)
 random.seed(0xDEADBEEF)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
-# Train the model, evaluating it every 10 epochs.
-def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_start = 1):
+def train(model, data_loaders,  hierarchy, epoch_start = 1):
 	logger.info("Training model.")
 
 
-	modelEvaluator = ModelEvaluator(model, data_loaders['dev'], word_vocab, wordpiece_vocab, hierarchy)
+	modelEvaluator = ModelEvaluator(model, data_loaders['dev'], hierarchy)
 	
 	optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=cf.LEARNING_RATE)
-
     
 	model.cuda()
-
 
 	num_batches = len(data_loaders["train"])
 	progress_bar = ProgressBar(num_batches = num_batches, max_epochs = cf.MAX_EPOCHS, logger = logger)
@@ -48,27 +43,26 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 
 	epoch_losses = []
 	avg_loss_png= []
-	# Train the model
+
 	for epoch in range(epoch_start, cf.MAX_EPOCHS + 1):
 		epoch_start_time = time.time()
 
 		for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(data_loaders["train"]):	
-			
-			batch_y = batch_y.float().to(device)	
-			# 2. Feed these Bert vectors to our model
+
+			batch_y = batch_y.float().to(device) 
+
+			# Feed these Bert vectors to our model
 			model.zero_grad()
 			model.train()
-
 			y_hat = model(batch_xl, batch_xr, batch_xa, batch_xm)
-
 			loss = model.calculate_loss(y_hat, batch_y)
 
-			# 3. Backpropagate
+			# Backpropagate
 			loss.backward()
 			optimizer.step()
 			epoch_losses.append(loss)
 
-			# 4. Draw the progress bar
+			# Draw the progress bar
 			progress_bar.draw_bar(i, epoch, epoch_start_time)
 			
 
@@ -79,10 +73,9 @@ def train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy, epoch_sta
 		modelEvaluator.evaluate_every_n_epochs(1, epoch)
 
 
-def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
+def create_model(data_loaders,  hierarchy, total_wordpieces):
 	model = MentionLevelModel(	embedding_dim = cf.EMBEDDING_DIM,
-						hidden_dim = cf.HIDDEN_DIM,
-						vocab_size = len(wordpiece_vocab),
+						hidden_dim = cf.HIDDEN_DIM,						
 						label_size = len(hierarchy),
 						dataset = cf.DATASET,
 						model_options = cf.MODEL_OPTIONS,
@@ -97,10 +90,10 @@ def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wor
 	return model
 
 
-def train_without_loading(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
-	model = create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces)
+def train_without_loading(data_loaders, hierarchy, total_wordpieces):
+	model = create_model(data_loaders, hierarchy, total_wordpieces)
 	model.cuda()
-	train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy)
+	train(model, data_loaders, hierarchy)
 
 
 def main():			
@@ -108,8 +101,6 @@ def main():
 	logger.info("Loading files...")
 
 	data_loaders = dutils.load_obj_from_pkl_file('data loaders', cf.ASSET_FOLDER + '/data_loaders.pkl')
-	word_vocab = dutils.load_obj_from_pkl_file('word vocab', cf.ASSET_FOLDER + '/word_vocab.pkl')
-	wordpiece_vocab = dutils.load_obj_from_pkl_file('wordpiece vocab', cf.ASSET_FOLDER + '/wordpiece_vocab.pkl')
 	total_wordpieces = dutils.load_obj_from_pkl_file('total wordpieces', cf.ASSET_FOLDER + '/total_wordpieces.pkl')
 	hierarchy = dutils.load_obj_from_pkl_file('hierarchy', cf.ASSET_FOLDER + '/hierarchy.pkl')
 	
@@ -125,10 +116,8 @@ def main():
 			if exc.errno != errno.EEXITST:
 				raise
 
-	train(model, data_loaders, word_vocab, wordpiece_vocab, hierarchy)
+	train(model, data_loaders, hierarchy)
 	writer.flush()
-
-		
 
 if __name__ == "__main__":
 	main()

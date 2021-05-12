@@ -11,24 +11,25 @@ from data_utils import batch_to_wordpieces, build_token_to_wp_mapping
 from load_config import load_config, device
 cf = load_config()
 
-
 from pathlib import Path
 here = Path(__file__).parent
 
 from torch.utils.tensorboard import SummaryWriter
-writer = writer = SummaryWriter('runs/ontonotes_modified/sdd_KLD_coe0.005')
+writer = writer = SummaryWriter('runs/runs/bbn_modified')
 
 
-torch.manual_seed(123)
-torch.backends.cudnn.deterministic=True
+# Ensure deterministic behavior
+torch.manual_seed(0xDEADBEEF)
+np.random.seed(0xDEADBEEF)
+random.seed(0xDEADBEEF)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 class ModelEvaluator():
 
-	def __init__(self, model, data_loader, word_vocab, wordpiece_vocab, hierarchy, mode="train"):
+	def __init__(self, model, data_loader, hierarchy, mode="train"):
 		self.model = model 
-		self.data_loader = data_loader 
-		self.word_vocab = word_vocab 
-		self.wordpiece_vocab = wordpiece_vocab
+		self.data_loader = data_loader 		
 		self.hierarchy = hierarchy
 		self.mode = mode
 		self.best_f1_and_epoch = [0.0, -1]
@@ -38,6 +39,7 @@ class ModelEvaluator():
 	def evaluate_model(self, epoch):		
 		if cf.EMBEDDING_MODEL == "bert":
 			self.bc =  get_contextualizer("bert-base-cased", device='cuda:0')
+			tokenizer = self.bc.get_tokenizer()
 		else:
 			self.bc = None
 
@@ -83,7 +85,7 @@ class ModelEvaluator():
 					labels_set.append(labels)
 				true_and_prediction.append((labels, preds))
 				batch_true_and_predictions.append((labels, preds))
-				every_entity_mention = ' '.join(batch_to_wordpieces(batch_xm, self.wordpiece_vocab)[j])
+				every_entity_mention = ' '.join(batch_to_wordpieces(batch_xm, tokenizer)[j])
 				every_entity_mention = re.sub("'", "", every_entity_mention)
 				entities.append(every_entity_mention)
 
@@ -172,19 +174,16 @@ class ModelEvaluator():
 				main()
 				exit()
 				
-def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
+def create_model(data_loaders, hierarchy, total_wordpieces):
 
 	from model import  MentionLevelModel
 	model = MentionLevelModel(	embedding_dim = cf.EMBEDDING_DIM,
 						hidden_dim = cf.HIDDEN_DIM,
-
-						vocab_size = len(wordpiece_vocab),
 						label_size = len(hierarchy),
 						dataset = cf.DATASET,
 						model_options = cf.MODEL_OPTIONS,
 						total_wordpieces = total_wordpieces,
 						category_counts = hierarchy.get_train_category_counts(),
-
 						context_window = cf.MODEL_OPTIONS['context_window'],
 						attention_type = cf.MODEL_OPTIONS['attention_type'],
 						mention_window = cf.MODEL_OPTIONS['mention_window'],
@@ -193,7 +192,7 @@ def create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wor
 
 	return model
 
-def evaluate_without_loading(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces):
+def evaluate_without_loading(data_loaders, hierarchy, total_wordpieces):
 	from model import E2EETModel, MentionLevelModel
 	from bert_encoder import  get_contextualizer
 	import jsonlines
@@ -201,10 +200,10 @@ def evaluate_without_loading(data_loaders, word_vocab, wordpiece_vocab, hierarch
 	bc = get_contextualizer("bert-base-cased", device='cuda:0')
 	logger.info("Loading files...")	
 	logger.info("Building model.")
-	model = create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces)	
+	model = create_model(data_loaders, hierarchy, total_wordpieces)	
 	model.cuda()
 	model.load_state_dict(torch.load(cf.BEST_MODEL_FILENAME))
-	modelEvaluator = ModelEvaluator(model, data_loaders['test'], word_vocab, wordpiece_vocab, hierarchy, bc, mode="test")	
+	modelEvaluator = ModelEvaluator(model, data_loaders['test'], hierarchy, mode="test")	
 	with jsonlines.open(cf.BEST_MODEL_JSON_FILENAME, "r") as reader:
 		for line in reader:
 			f1_score, epoch = line['f1_score'], line['epoch']
@@ -212,28 +211,24 @@ def evaluate_without_loading(data_loaders, word_vocab, wordpiece_vocab, hierarch
 
 
 def main():
-
 	from model import  MentionLevelModel
-	from bert_encoder import  get_contextualizer
 	import jsonlines	
+
 	logger.info("Loading files...")
 	data_loaders = dutils.load_obj_from_pkl_file('data loaders', cf.ASSET_FOLDER + '/data_loaders.pkl')
-	word_vocab = dutils.load_obj_from_pkl_file('word vocab', cf.ASSET_FOLDER + '/word_vocab.pkl')
-	wordpiece_vocab = dutils.load_obj_from_pkl_file('wordpiece vocab', cf.ASSET_FOLDER + '/wordpiece_vocab.pkl')
 	hierarchy = dutils.load_obj_from_pkl_file('hierarchy', cf.ASSET_FOLDER + '/hierarchy.pkl')
 	total_wordpieces = dutils.load_obj_from_pkl_file('total wordpieces', cf.ASSET_FOLDER + '/total_wordpieces.pkl')	
 	
 	logger.info("Building model.")
-	model = create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces)	
+	model = create_model(data_loaders, hierarchy, total_wordpieces)	
 	model.cuda()
 	model.load_state_dict(torch.load(cf.BEST_MODEL_FILENAME))
 
 
-	modelEvaluator = ModelEvaluator(model, data_loaders['test'], word_vocab, wordpiece_vocab, hierarchy, mode="test")	
+	modelEvaluator = ModelEvaluator(model, data_loaders['test'], hierarchy, mode="test")	
 	with jsonlines.open(cf.BEST_MODEL_JSON_FILENAME, "r") as reader:
 		for line in reader:
 			f1_score, epoch = line['f1_score'], line['epoch']
-			# writer.add_scalar("F1",f1_score , epoch)
 
 	modelEvaluator.evaluate_model(epoch)	
 	writer.flush()	

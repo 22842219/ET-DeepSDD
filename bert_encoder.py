@@ -108,7 +108,7 @@ class HuggingFaceContextualizer(Contextualizer):
         with torch.no_grad() if frozen else torch.enable_grad():
             model_output = self.hf_model(
                 input_ids=indices_tensor,
-                attention_mask=input_mask
+                attention_mask=None
             )
             embs = self.select_output(model_output)
             return embs
@@ -143,9 +143,8 @@ class BERTContextualizer(HuggingFaceContextualizer):
         # account for [CLS] and [SEP]
         return [-1] + mapping + [max(mapping) + 1]
 
-    def select_output(self, output: Any) -> torch.Tensor:
-        encoded = output.pooler_output  # List_Layer[R[Batch, Word, Emb]]
-        # stacked = torch.stack(encoded, dim=1)  # R[Batch, Layer, Word, Emb]
+    def select_output(self, output: Any) -> torch.Tensor:     
+        encoded = output.hidden_states[-2]  # List_Layer[R[Batch, Word, Emb]] 
         return encoded
 
 

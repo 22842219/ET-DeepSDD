@@ -87,13 +87,24 @@ class MentionFeatureExtractor(torch.nn.Module):
         return features  # R[Batch, Emb]
 
 class MentionLevelModel(nn.Module):
-	def __init__(self, dataset, embedding_dim, hidden_dim, vocab_size, label_size, model_options, total_wordpieces, category_counts, hierarchy_matrix, context_window, mention_window, attention_type, use_context_encoders):
+	def __init__(self, 
+				dataset, 
+				embedding_dim, 
+				hidden_dim, 
+				label_size, 
+				model_options, 
+				total_wordpieces, 
+				category_counts, 
+				hierarchy_matrix, 
+				context_window, 
+				mention_window, 
+				attention_type, 
+				use_context_encoders):
 		super(MentionLevelModel, self).__init__()
 
 		self.dataset = dataset
 		self.embedding_dim = embedding_dim
 		self.hidden_dim = hidden_dim
-		self.vocab_size = vocab_size
 		self.label_size = label_size
 
 		self.use_bilstm = model_options['use_bilstm']
@@ -111,9 +122,7 @@ class MentionLevelModel(nn.Module):
 		else:
 			self.layer_1 = nn.Linear(hidden_dim + hidden_dim + hidden_dim, hidden_dim)
 
-		self.hidden2tag = nn.Linear(hidden_dim, label_size)
-		
-	
+		self.hidden2tag = nn.Linear(hidden_dim, label_size)	
 
 		self.dropout = nn.Dropout(p=0.5)
 		self.dropout_l = nn.Dropout(p=0.5)
@@ -146,16 +155,14 @@ class MentionLevelModel(nn.Module):
 		# batch_xm = self.pre_trained_embedding_layer(batch_xm)
 
 		# # 1. Convert the batch_x from wordpiece ids into bert embedding vectors
-		bert_embs_l = self.bc.encode(batch_xl, frozen=True)	
-		# print("bert_embs_l:", bert_embs_l)			
+		bert_embs_l = self.bc.encode(batch_xl, frozen=True)			
 		bert_embs_r = self.bc.encode(batch_xr, frozen=True)		
 		bert_embs_m = self.bc.encode(batch_xm, frozen=True)
 		bert_embs_a = self.bc.encode(batch_xa, frozen=True)
 		
 		batch_xl = self.feature_extractor(bert_embs_a, bert_embs_l, batch_xl)  # R[Batch, Emb]
 		batch_xr = self.feature_extractor(bert_embs_a, bert_embs_r, batch_xr)  # R[Batch, Emb]
-		batch_xm = self.feature_extractor(bert_embs_a, bert_embs_m, batch_xm)  # R[Batch, Emb]
-		# print("bert_embs_l", bert_embs_l)
+		batch_xm = self.feature_extractor(bert_embs_a, bert_embs_m, batch_xm)  # R[Batch, Emb]	
 
 		if self.use_bilstm:		
 
@@ -204,9 +211,7 @@ class MentionLevelModel(nn.Module):
 			cmpe = CircuitMPE(bytes(here/"sdd_input"/self.dataset/"et.vtree"), bytes(here/"sdd_input"/self.dataset/"et.sdd"))
 			norm_y_hat = torch.sigmoid(y_hat)
 			semantic_loss = cmpe.compute_wmc(norm_y_hat)
-			print("semantic_loss:", semantic_loss)
-			loss = loss - 0.005 * semantic_loss
-			print("loss:", loss)
+			loss = loss - 0.05 * semantic_loss
 
 		return loss
 

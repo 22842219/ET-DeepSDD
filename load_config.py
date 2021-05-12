@@ -46,7 +46,6 @@ class Config():
 		self.MAX_EPOCHS = cf['max_epochs']
 		self.LEARNING_RATE = cf['learning_rate']
 		self.BATCH_SIZE = cf['batch_size']
-		self.MAX_SENT_LEN = cf['max_sent_len']
 		self.STOP_CONDITION = cf['stop_condition'] # Stop after this many epochs with no f1 improvement
 		self.MAX_SENTS = {"train": cf['max_train_sents'], "test": cf['max_test_sents'], "dev": cf['max_dev_sents']}
 
