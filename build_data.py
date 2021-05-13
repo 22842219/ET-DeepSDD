@@ -99,9 +99,9 @@ class Mention(Sentence):
 		self.wp_ids_mention = self.wordpiece_ids[self.wp_mention_start : self.wp_mention_end]	
 		self.wp_ids_all = self.wp_ids_left + self.wp_ids_mention + self.wp_ids_right
 
-		self.wp_ids_left_padding = self.wp_ids_left + [0]*(2*token_span - len(self.wp_ids_left ))
-		self.wp_ids_right_padding = self.wp_ids_right + [0]*(2*token_span - len(self.wp_ids_right ))
-		self.wp_ids_mention_padding = self.wp_ids_mention + [0]*(2*mention_span - len(self.wp_ids_mention ))
+		self.wp_ids_left_padding = self.wp_ids_left[:2*token_span] + [0]*(2*token_span - len(self.wp_ids_left ))
+		self.wp_ids_right_padding = self.wp_ids_right[:2*token_span] + [0]*(2*token_span - len(self.wp_ids_right ))
+		self.wp_ids_mention_padding = self.wp_ids_mention[:2*mention_span] + [0]*(2*mention_span - len(self.wp_ids_mention ))
 		self.wp_ids_all_padding =  self.wp_ids_left_padding + self.wp_ids_mention_padding + self.wp_ids_right_padding
 
 
@@ -208,6 +208,7 @@ def build_dataset(filepath, hierarchy, ds_name, contextualizer, tokenizer):
 		data_xa.append(np.asarray(mention.wp_ids_all_padding))
 		data_xm.append(np.asarray(mention.wp_ids_mention_padding))
 		data_y.append(np.asarray(mention.labels))	
+		print(len(mention.wp_ids_left_padding), len(mention.wp_ids_right_padding), len(mention.wp_ids_mention_padding))
 		
 	dataset = MentionTypingDataset(data_xl, data_xr, data_xa, data_xm, data_y)
 
@@ -233,7 +234,7 @@ def main():
 	contextualizer = get_contextualizer("bert-base-cased", device = device)
 	tokenizer = contextualizer.get_tokenizer()
 
-	vocab = tokenizer.save_vocabulary(save_directory= "/home/ziyu/Desktop/CODE/e2e-entity-typing")
+	vocab = tokenizer.save_vocabulary(save_directory= "/home/ziyu/Desktop/CODE/ET-DeepSDD")
 
 	data_loaders = {}
 	for ds_name, filepath in dataset_filenames.items():
