@@ -183,11 +183,10 @@ class CategoryHierarchy():
 
 
 # Convert an entire batch to wordpieces using the vocab object.
-def batch_to_wordpieces(batch_x, tokenizer):
+def batch_to_wordpieces(batch_x, tokenizer):	
 	wordpieces = []
-	padding_idx = vocab.token_to_ix["[PAD]"]
 	for wp_ids in batch_x:
-		wp = tokenizer.convert_ids_to_tokens(wordpiece_ids)
+		wp = tokenizer.convert_ids_to_tokens(wp_ids)
 		wordpieces.append(wp)
 	return wordpieces
 
