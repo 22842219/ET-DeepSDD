@@ -1,27 +1,28 @@
 import torch
 from torch.utils.data import DataLoader
-import sys
+import sys, random
 import numpy as np
 import pickle as pkl
 import codecs, jsonlines
 from logger import logger
+
 import data_utils as dutils
 from data_utils import CategoryHierarchy, EntityTypingDataset, MentionTypingDataset
-
-from load_config import load_config, device
-cf = load_config()
-
 from train import train_without_loading
 from evaluate import evaluate_without_loading
-
 from bert_encoder import  get_contextualizer
+from load_config import load_config, device
+cf = load_config()
 
 from pathlib import Path
 here = Path(__file__).parent
 
-
-torch.manual_seed(123)
-torch.backends.cudnn.deterministic=True
+# Ensure deterministic behavior
+torch.manual_seed(0xDEADBEEF)
+np.random.seed(0xDEADBEEF)
+random.seed(0xDEADBEEF)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 class Sentence(object):
 	def __init__(self, 		
@@ -173,9 +174,7 @@ def build_dataset(filepath, hierarchy, ds_name, contextualizer, tokenizer):
 			for m in line['mentions']:
 				start = m['start']
 				end = m['end']
-				# print("mention:", line["tokens"][start:end])
 				labels = hierarchy.categories2onehot(m['labels'])
-				# print("labels:", len(labels),labels)
 				mention = Mention(tokens, 
 								  token_ids,
 								  labels,								   
@@ -207,14 +206,10 @@ def build_dataset(filepath, hierarchy, ds_name, contextualizer, tokenizer):
 		data_xr.append(np.asarray(mention.wp_ids_right_padding))
 		data_xa.append(np.asarray(mention.wp_ids_all_padding))
 		data_xm.append(np.asarray(mention.wp_ids_mention_padding))
-		data_y.append(np.asarray(mention.labels))	
-		print(len(mention.wp_ids_left_padding), len(mention.wp_ids_right_padding), len(mention.wp_ids_mention_padding))
-		
+		data_y.append(np.asarray(mention.labels))				
 	dataset = MentionTypingDataset(data_xl, data_xr, data_xa, data_xm, data_y)
 
 	return dataset, total_wordpieces
-
-
 
 
 

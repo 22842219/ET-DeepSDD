@@ -155,10 +155,12 @@ class MentionLevelModel(nn.Module):
 		# batch_xm = self.pre_trained_embedding_layer(batch_xm)
 
 		# # 1. Convert the batch_x from wordpiece ids into bert embedding vectors
-		bert_embs_l = self.bc.encode(batch_xl, frozen=True)			
-		bert_embs_r = self.bc.encode(batch_xr, frozen=True)		
-		bert_embs_m = self.bc.encode(batch_xm, frozen=True)
-		bert_embs_a = self.bc.encode(batch_xa, frozen=True)
+		bert_embs_l = self.dropout_l(self.bc.encode(batch_xl, frozen=True))
+		bert_embs_r = self.dropout_r(self.bc.encode(batch_xr, frozen=True))
+		bert_embs_m = self.dropout_m(self.bc.encode(batch_xm, frozen=True))
+		bert_embs_a = self.dropout(self.bc.encode(batch_xa, frozen=True))
+
+
 		
 		batch_xl = self.feature_extractor(bert_embs_a, bert_embs_l, batch_xl)  # R[Batch, Emb]
 		batch_xr = self.feature_extractor(bert_embs_a, bert_embs_r, batch_xr)  # R[Batch, Emb]

@@ -1,4 +1,4 @@
-import torch
+import numpy as np
 import json, sys, random, re, matplotlib
 from sklearn.metrics import f1_score, classification_report, accuracy_score
 from colorama import Fore, Back, Style
@@ -14,6 +14,7 @@ cf = load_config()
 from pathlib import Path
 here = Path(__file__).parent
 
+import torch
 from torch.utils.tensorboard import SummaryWriter
 writer = writer = SummaryWriter('runs/runs/bbn_modified')
 
@@ -197,7 +198,6 @@ def evaluate_without_loading(data_loaders, hierarchy, total_wordpieces):
 	from bert_encoder import  get_contextualizer
 	import jsonlines
 	
-	bc = get_contextualizer("bert-base-cased", device='cuda:0')
 	logger.info("Loading files...")	
 	logger.info("Building model.")
 	model = create_model(data_loaders, hierarchy, total_wordpieces)	
