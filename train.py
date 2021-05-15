@@ -105,7 +105,7 @@ def main():
 	hierarchy = dutils.load_obj_from_pkl_file('hierarchy', cf.ASSET_FOLDER + '/hierarchy.pkl')
 	
 	logger.info("Building model.")
-	model = create_model(data_loaders, word_vocab, wordpiece_vocab, hierarchy, total_wordpieces)		
+	model = create_model(data_loaders, hierarchy, total_wordpieces)		
 	model.cuda()
 
 	folder ='{}/{}/{}/'.format(here, "predictions", model.dataset)

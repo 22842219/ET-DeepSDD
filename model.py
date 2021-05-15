@@ -26,65 +26,51 @@ import torch
 import torch.nn.functional as F
 from bert_encoder import  get_contextualizer
 
-class MentionFeatureExtractor(torch.nn.Module):
+class Pooler(torch.nn.Module):
 
     def __init__(self,
                  dim: int = 768,
                  dropout_rate: float = 0.5 ,
-                 mention_pooling: str = "attention",  # max / mean / attention
-      			 device: str = "cuda:0"
+                 pooling: str = "mean",  # max / mean / attention
+                 device: str = "cuda:0"
                  ):
-        super(MentionFeatureExtractor, self).__init__()
+        super(Pooler, self).__init__()
         self.device = device
-        self.mention_pooling = mention_pooling
+        self.pooling = pooling
         self.dim = dim
-        self.dropout = torch.nn.Dropout(dropout_rate)
-        self.projection = torch.nn.Linear(self.dim, self.dim)
-        torch.nn.init.eye_(self.projection.weight)
-        torch.nn.init.zeros_(self.projection.weight)
+        # self.dropout = torch.nn.Dropout(dropout_rate)
+        # self.projection = torch.nn.Linear(self.dim, self.dim)
 
-        if self.mention_pooling == "attention":
-            self.query = torch.nn.Parameter(torch.zeros(dim, dtype=torch.float32))
+
+        if self.pooling == "attention":
+            self.query = torch.nn.Parameter(torch.zeros(dim, dtype=torch.float32)) 
             torch.nn.init.normal_(self.query, mean=0.0, std=0.02)
-
-
+   
     def forward(self,
-                sentence: torch.Tensor,  # R[Batch, Word, Emb]  
                 span: torch.Tensor,  # R[Batch, Word, Emb]
-                span_lengths: torch.Tensor,  # Z[Batch, Word]   
                 ) -> torch.Tensor:  # R[Batch, Feature]
 
-        batch_size = sentence.size(0)
-        sentence_max_len = sentence.size(1)
-        emb_size = sentence.size(2)
-        span_max_len = span.size(1)
-        device = sentence.device
-        neg_inf = torch.tensor(-10000, dtype=torch.float32, device=device)
-        zero = torch.tensor(0, dtype=torch.float32, device=device)
+        batch_size = span.size(0)
+        sentence_len = span.size(1)
+        emb_size = span.size(2)
+        span_len = span.size(1)
 
-        span = self.projection(self.dropout(span))
-        sentence = self.projection(self.dropout(sentence))
+        # span = self.projection(self.dropout(span))
 
         def attention_pool():
             span_attn_scores = torch.einsum('e,bwe->bw', self.query, span)
-            masked_span_attn_scores = torch.where(span_lengths.type(torch.ByteTensor).to(self.device), span_attn_scores, neg_inf)
-            normalized_span_attn_scores = F.softmax(masked_span_attn_scores, dim=1)
+            normalized_span_attn_scores = F.softmax(span_attn_scores, dim=1)
             span_pooled = torch.einsum('bwe,bw->be', span, normalized_span_attn_scores)
             return span_pooled
 
         span_pooled = {
-            "max": lambda: torch.max(torch.where(span_lengths.unsqueeze(dim=2).expand_as(span), span, neg_inf), dim=1)[0],
-            "mean": lambda: torch.sum(
-                torch.where(span_lengths.unsqueeze(dim=2).expand_as(span).type(torch.ByteTensor).to(self.device), span, zero), dim=1
-            ) / span_lengths.unsqueeze(dim=1).expand(batch_size, emb_size),
+            "max": lambda: torch.max(span, dim=1)[0],
+            "mean": lambda: torch.sum(span, dim=1) / span_len,
             "attention": lambda: attention_pool()
-        }[self.mention_pooling]()  # R[Batch, Emb]
+        }[self.pooling]()  # R[Batch, Emb]
+       
+        return span_pooled  # R[Batch, Emb]
 
-        features = span_pooled
-
-
-
-        return features  # R[Batch, Emb]
 
 class MentionLevelModel(nn.Module):
 	def __init__(self, 
@@ -106,86 +92,61 @@ class MentionLevelModel(nn.Module):
 		self.embedding_dim = embedding_dim
 		self.hidden_dim = hidden_dim
 		self.label_size = label_size
-
-		self.use_bilstm = model_options['use_bilstm']
 		self.use_hierarchy 	 = model_options['use_hierarchy']
+		self.hierarchy_matrix = hierarchy_matrix
+		self.context_window = context_window
+		self.mention_window = mention_window
 
-		# self.pre_trained_embedding_layer = nn.Linear(embedding_dim, hidden_dim)
-		# self.pre_trained_embedding_layer.weight.requires_grad = False
-		
+		self.dropout = nn.Dropout(p=0.5)
 		self.bc = get_contextualizer("bert-base-cased", device='cuda:0') # R[Batch, Words, Emb]
-		self.feature_extractor = MentionFeatureExtractor(dim =self.embedding_dim, dropout_rate=0.5) # R[Batch, Emb]
+		self.embed_pooled = Pooler(dim =self.embedding_dim, dropout_rate=0.5) # R[Batch, Emb]
 
 		if self.use_bilstm:
 			self.lstm = nn.LSTM(hidden_dim,hidden_dim,1,bidirectional=True)
 			self.layer_1 = nn.Linear(hidden_dim*6, hidden_dim)
 		else:
-			self.layer_1 = nn.Linear(hidden_dim + hidden_dim + hidden_dim, hidden_dim)
-
-		self.hidden2tag = nn.Linear(hidden_dim, label_size)	
-
-		self.dropout = nn.Dropout(p=0.5)
-		self.dropout_l = nn.Dropout(p=0.5)
-		self.dropout_r = nn.Dropout(p=0.5)
-		self.dropout_m = nn.Dropout(p=0.5)
-
-		self.hierarchy_matrix = hierarchy_matrix
-		self.context_window = context_window
-		self.mention_window = mention_window
-
-		self.left_enc = nn.Linear(embedding_dim, hidden_dim)
-		self.right_enc = nn.Linear(embedding_dim, hidden_dim)
-		self.mention_enc = nn.Linear(embedding_dim, hidden_dim)
-				
+			self.layer_1 = nn.Linear(hidden_dim + hidden_dim + hidden_dim, hidden_dim)		
+		
+		self.use_context_encoders = use_context_encoders
+		self.projection = nn.Linear(embedding_dim, hidden_dim)	
 
 		self.attention_type = attention_type
-		self.use_context_encoders = use_context_encoders
-		
 		if self.attention_type == "dynamic":
 			print("Using dynamic attention")
 			self.attention_layer = nn.Linear(embedding_dim, 3)
 		elif self.attention_type == "scalar":
 			self.component_weights = nn.Parameter(torch.ones(3).float())
-
+			
+		self.hidden2tag = nn.Linear(hidden_dim, label_size)
 	
 	def forward(self, batch_xl, batch_xr, batch_xa, batch_xm):
 
-		# batch_xl = self.pre_trained_embedding_layer(batch_xl)
-		# batch_xr = self.pre_trained_embedding_layer(batch_xr)
-		# batch_xm = self.pre_trained_embedding_layer(batch_xm)
-
-		# # 1. Convert the batch_x from wordpiece ids into bert embedding vectors
-		bert_embs_l = self.dropout_l(self.bc.encode(batch_xl, frozen=True))
-		bert_embs_r = self.dropout_r(self.bc.encode(batch_xr, frozen=True))
-		bert_embs_m = self.dropout_m(self.bc.encode(batch_xm, frozen=True))
-		bert_embs_a = self.dropout(self.bc.encode(batch_xa, frozen=True))
-
-
+		# Convert the batch_x from wordpiece ids into bert embedding vectors
+		bert_embs_l = self.bc.encode(batch_xl, frozen=True)			
+		bert_embs_r = self.bc.encode(batch_xr, frozen=True)		
+		bert_embs_m = self.bc.encode(batch_xm, frozen=True)
+		bert_embs_a = self.bc.encode(batch_xa, frozen=True)
 		
-		batch_xl = self.feature_extractor(bert_embs_a, bert_embs_l, batch_xl)  # R[Batch, Emb]
-		batch_xr = self.feature_extractor(bert_embs_a, bert_embs_r, batch_xr)  # R[Batch, Emb]
-		batch_xm = self.feature_extractor(bert_embs_a, bert_embs_m, batch_xm)  # R[Batch, Emb]	
+		# Pooling 
+		batch_xl = self.embed_pooled(bert_embs_l)  # R[Batch, Emb]
+		batch_xr = self.embed_pooled(bert_embs_r)  # R[Batch, Emb]
+		batch_xm = self.embed_pooled(bert_embs_m)  # R[Batch, Emb]	
 
 		if self.use_bilstm:		
-
 			batch_xl = batch_xl.unsqueeze(0)
 			batch_xr = batch_xr.unsqueeze(0)
 			batch_xm = batch_xm.unsqueeze(0)
-
 			batch_xl, _ = self.lstm(batch_xl)
 			batch_xr, _ = self.lstm(batch_xr)
 			batch_xm, _ = self.lstm(batch_xm)
 			batch_xl = batch_xl.squeeze(0)
 			batch_xr = batch_xr.squeeze(0)
 			batch_xm = batch_xm.squeeze(0)
-		
 
 		if self.use_context_encoders:	
-
-			batch_xl = self.dropout_l(torch.relu(self.left_enc(batch_xl)))
-			batch_xr = self.dropout_l(torch.relu(self.right_enc(batch_xr)))
-			batch_xm = self.dropout_l(torch.relu(self.mention_enc(batch_xm)))
-
+			batch_xl = self.dropout(torch.relu(self.projection(batch_xl)))
+			batch_xr = self.dropout(torch.relu(self.projection(batch_xr)))
+			batch_xm = self.dropout(torch.relu(self.projection(batch_xm)))
 
 		if self.attention_type == "dynamic":		
 			attn_weights = torch.softmax(self.attention_layer(batch_xm), dim=1)

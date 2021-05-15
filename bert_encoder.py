@@ -144,8 +144,8 @@ class BERTContextualizer(HuggingFaceContextualizer):
         return [-1] + mapping + [max(mapping) + 1]
 
     def select_output(self, output: Any) -> torch.Tensor:     
-        encoded = output.hidden_states[-2]  # List_Layer[R[Batch, Word, Emb]] 
-        return encoded
+        sequence_output = output.hidden_states[-2]  # List_Layer[R[Batch, Word, Emb]] 
+        return sequence_output
 
 
 

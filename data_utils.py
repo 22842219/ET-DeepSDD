@@ -187,7 +187,8 @@ def batch_to_wordpieces(batch_x, tokenizer):
 	wordpieces = []
 	for wp_ids in batch_x:
 		wp = tokenizer.convert_ids_to_tokens(wp_ids)
-		if wp != [PAD]:
+		print("wp:",wp)
+		if wp != '[ P A D ]':
 			wordpieces.append(wp)
 	return wordpieces
 
