@@ -26,12 +26,14 @@ import torch
 import torch.nn.functional as F
 from bert_encoder import  get_contextualizer
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class Pooler(torch.nn.Module):
 
     def __init__(self,
                  dim: int = 768,
                  dropout_rate: float = 0.5 ,
-                 pooling: str = "attention",  # max / mean / attention
+                 pooling: str = "mean",  # max / mean / attention
                  device: str = "cuda:0"
                  ):
         super(Pooler, self).__init__()
@@ -68,9 +70,10 @@ class Pooler(torch.nn.Module):
             return span_pooled
 
         span_pooled = {
-            "max": lambda: torch.max(torch.where(span_mask.unsqueeze(dim=2).expand_as(span).type(ByteTensor).to(device), span, neg_inf), dim=1)[0],
-            "mean": lambda: torch.sum( torch.mul(span, span_mask.unsqueeze(dim =2).expand_as(span)), dim=1) 
-            	/ torch.sum(span_mask,dim =1).unsqueeze(dim=1).expand_as(span),
+            "max": lambda: torch.max(torch.where(span_mask.unsqueeze(dim=2).expand_as(span).type(torch.ByteTensor).to(device), span, neg_inf), dim=1)[0],
+            "mean": lambda:  torch.sum(
+                torch.where(span_mask.unsqueeze(dim=2).expand_as(span).type(torch.ByteTensor).to(device), span, zero), dim=1
+            ) / torch.sum(span_mask,dim =1).unsqueeze(dim=1).expand(batch_size, emb_size),
             "attention": lambda: attention_pool()
         }[self.pooling]()  # R[Batch, Emb]
        
@@ -128,11 +131,12 @@ class MentionLevelModel(nn.Module):
 	def forward(self, batch_xl, batch_xr, batch_xa, batch_xm):
 
 		# Convert the batch_x from wordpiece ids into bert embedding vectors
-		bert_embs_l, span_mask_l = self.bc.encode(batch_xl, frozen=True)			
+		bert_embs_l, span_mask_l = self.bc.encode(batch_xl, frozen=True)  	# R[Batch, Word, Emb], R[Batch, Word_Mask]		
 		bert_embs_r, span_mask_r  = self.bc.encode(batch_xr, frozen=True)		
 		bert_embs_m, span_mask_m  = self.bc.encode(batch_xm, frozen=True)
-		bert_embs_a, span_mask_a  = self.bc.encode(batch_xa, frozen=True)		
-		# Pooling 
+		bert_embs_a, span_mask_a  = self.bc.encode(batch_xa, frozen=True)
+
+		#Pooling 
 		batch_xl = self.embed_pooled(bert_embs_l, span_mask_l)  # R[Batch, Emb]
 		batch_xr = self.embed_pooled(bert_embs_r, span_mask_r)  # R[Batch, Emb]
 		batch_xm = self.embed_pooled(bert_embs_m, span_mask_m)  # R[Batch, Emb]	
