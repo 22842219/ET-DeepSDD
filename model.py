@@ -72,8 +72,7 @@ class Pooler(torch.nn.Module):
         span_pooled = {
             "max": lambda: torch.max(torch.where(span_mask.unsqueeze(dim=2).expand_as(span).type(torch.ByteTensor).to(device), span, neg_inf), dim=1)[0],
             "mean": lambda:  torch.sum(
-                torch.where(span_mask.unsqueeze(dim=2).expand_as(span).type(torch.ByteTensor).to(device), span, zero), dim=1
-            ) / torch.sum(span_mask,dim =1).unsqueeze(dim=1).expand(batch_size, emb_size),
+                torch.where(span_mask.unsqueeze(dim=2).expand_as(span).type(torch.ByteTensor).to(device), span, zero), dim=1) / torch.sum(span_mask,dim =1).unsqueeze(dim=1).expand(batch_size, emb_size),
             "attention": lambda: attention_pool()
         }[self.pooling]()  # R[Batch, Emb]
        
@@ -114,7 +113,7 @@ class MentionLevelModel(nn.Module):
 			self.lstm = nn.LSTM(hidden_dim,hidden_dim,1,bidirectional=True)
 			self.layer_1 = nn.Linear(hidden_dim*6, hidden_dim)
 		else:
-			self.layer_1 = nn.Linear(hidden_dim + hidden_dim + hidden_dim, hidden_dim)		
+			self.layer_1 = nn.Linear(hidden_dim, hidden_dim)		
 		
 		self.use_context_encoders = use_context_encoders
 		self.projection = nn.Linear(embedding_dim, hidden_dim)	
@@ -130,16 +129,17 @@ class MentionLevelModel(nn.Module):
 	
 	def forward(self, batch_xl, batch_xr, batch_xa, batch_xm):
 
-		# Convert the batch_x from wordpiece ids into bert embedding vectors
+		# Convert the batch_x from wordpiece ids into bert embedding vectors		
 		bert_embs_l, span_mask_l = self.bc.encode(batch_xl, frozen=True)  	# R[Batch, Word, Emb], R[Batch, Word_Mask]		
 		bert_embs_r, span_mask_r  = self.bc.encode(batch_xr, frozen=True)		
 		bert_embs_m, span_mask_m  = self.bc.encode(batch_xm, frozen=True)
 		bert_embs_a, span_mask_a  = self.bc.encode(batch_xa, frozen=True)
 
 		#Pooling 
-		batch_xl = self.embed_pooled(bert_embs_l, span_mask_l)  # R[Batch, Emb]
-		batch_xr = self.embed_pooled(bert_embs_r, span_mask_r)  # R[Batch, Emb]
-		batch_xm = self.embed_pooled(bert_embs_m, span_mask_m)  # R[Batch, Emb]	
+		# batch_xl = self.embed_pooled(bert_embs_l, span_mask_l)  # R[Batch, Emb]
+		# batch_xr = self.embed_pooled(bert_embs_r, span_mask_r)  # R[Batch, Emb]
+		# batch_xm = self.embed_pooled(bert_embs_m, span_mask_m)  # R[Batch, Emb]	
+		batch_xa = self.embed_pooled(bert_embs_a, span_mask_a)  # R[Batch, Emb]
 
 		if self.use_bilstm:		
 			batch_xl = batch_xl.unsqueeze(0)
@@ -167,16 +167,15 @@ class MentionLevelModel(nn.Module):
 			joined = torch.cat((batch_xl * component_weights[0], batch_xr * component_weights[1],  batch_xm * component_weights[2]), 1)
 		elif self.attention_type == "none":
 			joined = torch.cat((batch_xl, batch_xr,  batch_xm), 1)
-			
-		batch_x_out = self.dropout(torch.relu(self.layer_1(joined)))		
-		y_hat = self.hidden2tag(batch_x_out)	
+					
+		batch_x_out = self.dropout(torch.relu(self.layer_1(batch_xa)))	
+		y_hat = self.hidden2tag(batch_x_out)
 	
 		return y_hat
 
 	def calculate_loss(self, y_hat, batch_y):
 		cross_entropy = nn.BCEWithLogitsLoss()
 		loss = cross_entropy(y_hat, batch_y)
-		print("cross entropy loss:",loss)
 
 		if self.use_hierarchy:
 			# Create CircuitMPE for predictions
