@@ -48,9 +48,7 @@ def train(model, data_loaders,  hierarchy, epoch_start = 1):
 		epoch_start_time = time.time()
 
 		for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(data_loaders["train"]):	
-
 			batch_y = batch_y.float().to(device) 
-
 			# Feed these Bert vectors to our model
 			model.zero_grad()
 			model.train()
@@ -63,8 +61,7 @@ def train(model, data_loaders,  hierarchy, epoch_start = 1):
 			epoch_losses.append(loss)
 
 			# Draw the progress bar
-			progress_bar.draw_bar(i, epoch, epoch_start_time)
-			
+			progress_bar.draw_bar(i, epoch, epoch_start_time)			
 
 		avg_loss = sum(epoch_losses) / float(len(epoch_losses))
 		avg_loss_list.append(avg_loss)
