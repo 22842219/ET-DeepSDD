@@ -6,10 +6,6 @@ import codecs, sys
 import numpy as np
 from load_config import device
 
-
-torch.manual_seed(123)
-torch.backends.cudnn.deterministic=True
-
 # Save an object to a pickle file and provide a message when complete.
 def save_obj_to_pkl_file(obj, obj_name, fname):
 	with open(fname, 'wb') as f:
@@ -187,67 +183,6 @@ def batch_to_wordpieces(batch_x, tokenizer):
 	wordpieces = []
 	for wp_ids in batch_x:
 		wp = tokenizer.convert_ids_to_tokens(wp_ids)
-		print("wp:",wp)
-		if wp != '[ P A D ]':
-			wordpieces.append(wp)
+		wordpieces.append(wp)
 	return wordpieces
-
-
-
-def wordpieces_to_bert_embs(batch_x, bc):
-	return torch.from_numpy(bc.encode(batch_x, frozen=True))
-
-
-# Takes a token to wordpiece vector and modifies it as follows:
-#   [1, 3, 4] ->
-# [ [1, 2], [3], [4] ]
-def build_token_to_wp_mapping(batch_tm):
-	token_idxs_to_wp_idxs = []
-	for row in batch_tm:		
-		ls = [i for i in row.tolist() if i >= 0]
-
-		token_idxs_to_wp_idxs.append([None] * len(ls))
-
-		for i, item in enumerate(ls):
-					
-			if i+1 > len(ls) - 1:
-				m = ls[i] + 1
-			else:
-				m = ls[i+1]	
-
-			token_idxs_to_wp_idxs[-1][i] = range(ls[i], m)
-
-	return token_idxs_to_wp_idxs
-
-# Load embeddings from file for Glove.
-# Some code in this function was found at https://github.com/guillaumegenthial/sequence_wtagging
-def load_embeddings(emb_model, word_vocab, embedding_dim):
-	if emb_model == "glove":
-		emb_file = 'glove/glove.6B.300d.txt'
-	elif emb_model == "word2vec":
-		#emb_file = 'word2vec/GoogleNews-vectors-negative300.txt'
-		emb_file = 'word2vec/enwiki_20180420_300d.txt'
-	else:
-		raise Exception("Embedding model not supported")
-		#with np.load(emb_file) as data:
-		#	embs = data["embeddings"]
-
-	print("Loading embeddings")
-	print(word_vocab.ix_to_token[0])
-	embeddings = np.zeros([len(word_vocab), embedding_dim])
-	with open(emb_file) as f:
-		for line in f:
-			line = line.strip().split(' ')
-			word = line[0]
-			embedding = [float(x) for x in line[1:]]
-			if word in word_vocab.token_to_ix:
-				word_idx = word_vocab.token_to_ix[word.lower()]
-				embeddings[word_idx] = np.asarray(embedding)
-
-	print("Found %d embeddings" % len(embeddings))
-
-	#for i, embedding in enumerate(embeddings):
-	#	print(word_vocab.ix_to_token[i], embedding[:5])
-	return embeddings
-	
 

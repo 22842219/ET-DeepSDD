@@ -95,7 +95,8 @@ class HuggingFaceContextualizer(Contextualizer):
         for i in range(bsz):
             for j in range(lengths[i]):
                 indices_tensor[i, j] = indexed_sentences[i][j]
-                input_mask[i, j] = 1
+                if indexed_sentences[i][j]!= 0:
+                    input_mask[i, j] = 1
 
         indices_tensor = indices_tensor.to(device=self.device)
         input_mask = input_mask.to(device=self.device)
@@ -111,7 +112,7 @@ class HuggingFaceContextualizer(Contextualizer):
                 attention_mask=None
             )
             embs = self.select_output(model_output)
-            return embs
+            return embs, input_mask
 
 class BERTContextualizer(HuggingFaceContextualizer):
 

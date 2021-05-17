@@ -31,7 +31,7 @@ class Pooler(torch.nn.Module):
     def __init__(self,
                  dim: int = 768,
                  dropout_rate: float = 0.5 ,
-                 pooling: str = "mean",  # max / mean / attention
+                 pooling: str = "attention",  # max / mean / attention
                  device: str = "cuda:0"
                  ):
         super(Pooler, self).__init__()
@@ -48,24 +48,29 @@ class Pooler(torch.nn.Module):
    
     def forward(self,
                 span: torch.Tensor,  # R[Batch, Word, Emb]
+                span_mask: torch.Tensor, # R[Batch, word_ids]
                 ) -> torch.Tensor:  # R[Batch, Feature]
 
         batch_size = span.size(0)
         sentence_len = span.size(1)
         emb_size = span.size(2)
         span_len = span.size(1)
+        neg_inf = torch.tensor(-10000, dtype=torch.float32, device=device)
+        zero = torch.tensor(0, dtype=torch.float32, device=device)
 
         # span = self.projection(self.dropout(span))
 
         def attention_pool():
             span_attn_scores = torch.einsum('e,bwe->bw', self.query, span)
-            normalized_span_attn_scores = F.softmax(span_attn_scores, dim=1)
+            masked_span_attn_scores = torch.where(span_mask.type(torch.ByteTensor).to(device), span_attn_scores, neg_inf)
+            normalized_span_attn_scores = F.softmax(masked_span_attn_scores, dim=1)
             span_pooled = torch.einsum('bwe,bw->be', span, normalized_span_attn_scores)
             return span_pooled
 
         span_pooled = {
-            "max": lambda: torch.max(span, dim=1)[0],
-            "mean": lambda: torch.sum(span, dim=1) / span_len,
+            "max": lambda: torch.max(torch.where(span_mask.unsqueeze(dim=2).expand_as(span).type(ByteTensor).to(device), span, neg_inf), dim=1)[0],
+            "mean": lambda: torch.sum( torch.mul(span, span_mask.unsqueeze(dim =2).expand_as(span)), dim=1) 
+            	/ torch.sum(span_mask,dim =1).unsqueeze(dim=1).expand_as(span),
             "attention": lambda: attention_pool()
         }[self.pooling]()  # R[Batch, Emb]
        
@@ -93,6 +98,7 @@ class MentionLevelModel(nn.Module):
 		self.hidden_dim = hidden_dim
 		self.label_size = label_size
 		self.use_hierarchy 	 = model_options['use_hierarchy']
+		self.use_bilstm 	 = model_options['use_bilstm']
 		self.hierarchy_matrix = hierarchy_matrix
 		self.context_window = context_window
 		self.mention_window = mention_window
@@ -116,21 +122,20 @@ class MentionLevelModel(nn.Module):
 			self.attention_layer = nn.Linear(embedding_dim, 3)
 		elif self.attention_type == "scalar":
 			self.component_weights = nn.Parameter(torch.ones(3).float())
-			
+
 		self.hidden2tag = nn.Linear(hidden_dim, label_size)
 	
 	def forward(self, batch_xl, batch_xr, batch_xa, batch_xm):
 
 		# Convert the batch_x from wordpiece ids into bert embedding vectors
-		bert_embs_l = self.bc.encode(batch_xl, frozen=True)			
-		bert_embs_r = self.bc.encode(batch_xr, frozen=True)		
-		bert_embs_m = self.bc.encode(batch_xm, frozen=True)
-		bert_embs_a = self.bc.encode(batch_xa, frozen=True)
-		
+		bert_embs_l, span_mask_l = self.bc.encode(batch_xl, frozen=True)			
+		bert_embs_r, span_mask_r  = self.bc.encode(batch_xr, frozen=True)		
+		bert_embs_m, span_mask_m  = self.bc.encode(batch_xm, frozen=True)
+		bert_embs_a, span_mask_a  = self.bc.encode(batch_xa, frozen=True)		
 		# Pooling 
-		batch_xl = self.embed_pooled(bert_embs_l)  # R[Batch, Emb]
-		batch_xr = self.embed_pooled(bert_embs_r)  # R[Batch, Emb]
-		batch_xm = self.embed_pooled(bert_embs_m)  # R[Batch, Emb]	
+		batch_xl = self.embed_pooled(bert_embs_l, span_mask_l)  # R[Batch, Emb]
+		batch_xr = self.embed_pooled(bert_embs_r, span_mask_r)  # R[Batch, Emb]
+		batch_xm = self.embed_pooled(bert_embs_m, span_mask_m)  # R[Batch, Emb]	
 
 		if self.use_bilstm:		
 			batch_xl = batch_xl.unsqueeze(0)

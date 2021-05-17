@@ -7,7 +7,7 @@ from logger import logger
 import nfgec_evaluate 
 from bert_encoder import  get_contextualizer
 import data_utils as dutils
-from data_utils import batch_to_wordpieces, build_token_to_wp_mapping
+from data_utils import batch_to_wordpieces
 from load_config import load_config, device
 cf = load_config()
 
@@ -86,14 +86,12 @@ class ModelEvaluator():
 					labels_set.append(labels)
 				true_and_prediction.append((labels, preds))
 				batch_true_and_predictions.append((labels, preds))
-				every_entity_mention = ' '.join(batch_to_wordpieces(batch_xm, tokenizer)[j])
-				every_entity_mention = re.sub("'", "", every_entity_mention)
-				entities.append(every_entity_mention)
 
-
-			s = ""		
+				for every_wordpieces in batch_to_wordpieces(batch_xm, tokenizer)[j]:
+					entity = ' '.join(every_wordpieces[: every_wordpieces.index('[PAD]')])
+					entities.append(every_entity_mention)
+			s = ""	
 			for i, every_tuple in enumerate(batch_true_and_predictions):
-				s += "Entity Mention:"
 				s += " ".join(entities[i])	
 				s += "\n"				
 				s += "Predicted: "
