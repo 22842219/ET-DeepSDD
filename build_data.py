@@ -93,7 +93,6 @@ class Mention(Sentence):
 		self.ctx_right = self.token_ids[self.token_mention_end : min(self.token_mention_end + token_span, len(self.token_ids))]
 		self.ctx_mention = self.token_ids[self.token_mention_start : self.token_mention_end]	
 		self.ctx_all = self.ctx_left + self.ctx_mention + self.ctx_right
-
 		
 		self.wp_ids_left = self.wordpiece_ids[self.token_idxs_to_wp_idxs.index(wp_l_span) : self.wp_mention_start]
 		self.wp_ids_right = self.wordpiece_ids[self.wp_mention_end : self.token_idxs_to_wp_idxs.index(wp_r_span)]	
@@ -105,8 +104,9 @@ class Mention(Sentence):
 		self.wp_ids_mention_padding = self.wp_ids_mention[:2*mention_span] + [0]*(2*mention_span - len(self.wp_ids_mention ))
 		self.wp_ids_all_padding =  self.wp_ids_left_padding + self.wp_ids_mention_padding + self.wp_ids_right_padding
 
-
-
+		print(self.wp_ids_left_padding)
+		print(self.wp_ids_right_padding)
+		print(self.wp_ids_mention_padding)
 
 	def is_valid(self):
 		maxlen 	 = cf.MODEL_OPTIONS['context_window']
@@ -170,10 +170,11 @@ def build_dataset(filepath, hierarchy, ds_name, contextualizer, tokenizer):
 			for i, item in enumerate(token_ids):
 				if item == 100 and tokens[i] not in unknown_words:
 					unknown_words.append(tokens[i])
-
-			for m in line['mentions']:
+			for m in line['mentions']:								
 				start = m['start']
 				end = m['end']
+				if start == -1 and end == -1:
+					continue
 				labels = hierarchy.categories2onehot(m['labels'])
 				mention = Mention(tokens, 
 								  token_ids,
@@ -206,7 +207,7 @@ def build_dataset(filepath, hierarchy, ds_name, contextualizer, tokenizer):
 		data_xr.append(np.asarray(mention.wp_ids_right_padding))
 		data_xa.append(np.asarray(mention.wp_ids_all_padding))
 		data_xm.append(np.asarray(mention.wp_ids_mention_padding))
-		data_y.append(np.asarray(mention.labels))				
+		data_y.append(np.asarray(mention.labels))		
 	dataset = MentionTypingDataset(data_xl, data_xr, data_xa, data_xm, data_y)
 
 	return dataset, total_wordpieces
