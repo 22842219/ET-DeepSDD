@@ -144,9 +144,12 @@ class BERTContextualizer(HuggingFaceContextualizer):
         # account for [CLS] and [SEP]
         return [-1] + mapping + [max(mapping) + 1]
 
-    def select_output(self, output: Any) -> torch.Tensor:     
-        sequence_output = output.hidden_states[-2]  # List_Layer[R[Batch, Word, Emb]] 
-        return sequence_output
+    def select_output(self, output: Any) -> torch.Tensor: 
+        cls_re = output.pooler_output  # R[Batch, Emb] w.r.t token '[CLS]' of last hidden layer
+        lhs_re = output.last_hidden_state # R[Batch, Word, Emb] w.r.t last hidden layer
+        hidden_states_ = output.hidden_states  # List_Layer[R[Batch, Word, Emb]] of 13 length
+        embes = hidden_states_[0]  #  R[Batch, Word, Emb] w.r.t embedding
+        return embes
 
 
 
