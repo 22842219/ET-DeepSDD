@@ -88,9 +88,8 @@ class ModelEvaluator():
 				batch_true_and_predictions.append((labels, preds))
 
 				for every_wordpieces in batch_to_wordpieces(batch_xm, tokenizer):
-					entity = ' '.join(every_wordpieces[: every_wordpieces.index('[PAD]')])
-					entities.append(entity
-						)
+					entity = ' '.join(every_wordpieces)
+					entities.append(entity						)
 			s = ""	
 			for i, every_tuple in enumerate(batch_true_and_predictions):
 				s += " ".join(entities[i])	
