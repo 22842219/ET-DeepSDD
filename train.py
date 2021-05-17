@@ -19,7 +19,7 @@ from pathlib import Path
 here = Path(__file__).parent
 
 from torch.utils.tensorboard import SummaryWriter
-writer = writer = SummaryWriter('runs/bbn_modified')
+writer = SummaryWriter('runs/bbn_modified')
 
 torch.manual_seed(0xDEADBEEF)
 np.random.seed(0xDEADBEEF)

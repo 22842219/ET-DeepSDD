@@ -16,7 +16,7 @@ here = Path(__file__).parent
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
-writer = writer = SummaryWriter('runs/runs/bbn_modified')
+writer = SummaryWriter('runs/bbn_modified')
 
 
 # Ensure deterministic behavior
@@ -87,9 +87,10 @@ class ModelEvaluator():
 				true_and_prediction.append((labels, preds))
 				batch_true_and_predictions.append((labels, preds))
 
-				for every_wordpieces in batch_to_wordpieces(batch_xm, tokenizer)[j]:
+				for every_wordpieces in batch_to_wordpieces(batch_xm, tokenizer):
 					entity = ' '.join(every_wordpieces[: every_wordpieces.index('[PAD]')])
-					entities.append(every_entity_mention)
+					entities.append(entity
+						)
 			s = ""	
 			for i, every_tuple in enumerate(batch_true_and_predictions):
 				s += " ".join(entities[i])	
