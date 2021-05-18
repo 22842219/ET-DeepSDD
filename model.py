@@ -71,8 +71,8 @@ class Pooler(torch.nn.Module):
 
         span_pooled = {
             "max": lambda: torch.max(torch.where(span_mask.unsqueeze(dim=2).expand_as(span).type(torch.ByteTensor).to(device), span, neg_inf), dim=1)[0],
-            "mean": lambda:  torch.sum(
-                torch.where(span_mask.unsqueeze(dim=2).expand_as(span).type(torch.ByteTensor).to(device), span, zero), dim=1) / torch.sum(span_mask,dim =1).unsqueeze(dim=1).expand(batch_size, emb_size),
+            "mean": lambda:  torch.mean(
+                torch.where(span_mask.unsqueeze(dim=2).expand_as(span).type(torch.ByteTensor).to(device), span, zero), dim=1),
             "attention": lambda: attention_pool()
         }[self.pooling]()  # R[Batch, Emb]
        
@@ -113,7 +113,7 @@ class MentionLevelModel(nn.Module):
 			self.lstm = nn.LSTM(hidden_dim,hidden_dim,1,bidirectional=True)
 			self.layer_1 = nn.Linear(hidden_dim*6, hidden_dim)
 		else:
-			self.layer_1 = nn.Linear(hidden_dim, hidden_dim)		
+			self.layer_1 = nn.Linear(hidden_dim*3, hidden_dim)		
 		
 		self.use_context_encoders = use_context_encoders
 		self.projection = nn.Linear(embedding_dim, hidden_dim)	
@@ -136,10 +136,10 @@ class MentionLevelModel(nn.Module):
 		bert_embs_a, span_mask_a  = self.bc.encode(batch_xa, frozen=True)
 
 		#Pooling 
-		# batch_xl = self.embed_pooled(bert_embs_l, span_mask_l)  # R[Batch, Emb]
-		# batch_xr = self.embed_pooled(bert_embs_r, span_mask_r)  # R[Batch, Emb]
-		# batch_xm = self.embed_pooled(bert_embs_m, span_mask_m)  # R[Batch, Emb]	
-		batch_xa = self.embed_pooled(bert_embs_a, span_mask_a)  # R[Batch, Emb]
+		batch_xl = self.embed_pooled(bert_embs_l, span_mask_l)  # R[Batch, Emb]
+		batch_xr = self.embed_pooled(bert_embs_r, span_mask_r)  # R[Batch, Emb]
+		batch_xm = self.embed_pooled(bert_embs_m, span_mask_m)  # R[Batch, Emb]	
+		# batch_xa = self.embed_pooled(bert_embs_a, span_mask_a)  # R[Batch, Emb]
 
 		if self.use_bilstm:		
 			batch_xl = batch_xl.unsqueeze(0)
@@ -168,7 +168,7 @@ class MentionLevelModel(nn.Module):
 		elif self.attention_type == "none":
 			joined = torch.cat((batch_xl, batch_xr,  batch_xm), 1)
 					
-		batch_x_out = self.dropout(torch.relu(self.layer_1(batch_xa)))	
+		batch_x_out = self.dropout(torch.relu(self.layer_1(joined)))	
 		y_hat = self.hidden2tag(batch_x_out)
 	
 		return y_hat

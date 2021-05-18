@@ -104,10 +104,6 @@ class Mention(Sentence):
 		self.wp_ids_mention_padding = self.wp_ids_mention[:2*mention_span] + [0]*(2*mention_span - len(self.wp_ids_mention ))
 		self.wp_ids_all_padding =  self.wp_ids_left_padding + self.wp_ids_mention_padding + self.wp_ids_right_padding
 
-		print(self.wp_ids_left_padding)
-		print(self.wp_ids_right_padding)
-		print(self.wp_ids_mention_padding)
-
 	def is_valid(self):
 		maxlen 	 = cf.MODEL_OPTIONS['context_window']
 		maxlen_m = cf.MODEL_OPTIONS['mention_window'] 
