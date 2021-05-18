@@ -33,15 +33,15 @@ class Pooler(torch.nn.Module):
     def __init__(self,
                  dim: int = 768,
                  dropout_rate: float = 0.5 ,
-                 pooling: str = "mean",  # max / mean / attention
+                 pooling: str = "attention",  # max / mean / attention
                  device: str = "cuda:0"
                  ):
         super(Pooler, self).__init__()
         self.device = device
         self.pooling = pooling
         self.dim = dim
-        # self.dropout = torch.nn.Dropout(dropout_rate)
-        # self.projection = torch.nn.Linear(self.dim, self.dim)
+        self.dropout = torch.nn.Dropout(dropout_rate)
+        self.projection = torch.nn.Linear(self.dim, self.dim)
 
 
         if self.pooling == "attention":
@@ -60,7 +60,7 @@ class Pooler(torch.nn.Module):
         neg_inf = torch.tensor(-10000, dtype=torch.float32, device=device)
         zero = torch.tensor(0, dtype=torch.float32, device=device)
 
-        # span = self.projection(self.dropout(span))
+        span = self.projection(self.dropout(span))
 
         def attention_pool():
             span_attn_scores = torch.einsum('e,bwe->bw', self.query, span)
