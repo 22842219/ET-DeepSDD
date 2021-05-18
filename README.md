@@ -12,7 +12,7 @@ Firstly, construct sdd tree based on customized logical formula.
 ```
 python sdd.py --dataset bbn_modified --label_size 48
 ```
-Secondly, Config arguments in config.json.
+Secondly, Configure arguments in config.json.
 
 Then, build the data loader.
 
