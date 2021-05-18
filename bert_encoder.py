@@ -50,10 +50,12 @@ class HuggingFaceContextualizer(Contextualizer):
     def __init__(self,
                  hf_tokenizer: transformers.PreTrainedTokenizer,
                  hf_model: transformers.PreTrainedModel,
+                 options: str,
                  device: str
                  ):
         self.hf_tokenizer = hf_tokenizer
         self.hf_model = hf_model
+        self.options = options
         self.device = device
 
     @abstractmethod
@@ -63,7 +65,10 @@ class HuggingFaceContextualizer(Contextualizer):
         raise NotImplementedError
 
     @abstractmethod
-    def select_output(self, output: Any) -> torch.Tensor:
+    def select_output(self, 
+                    output: Any,
+                    options
+                    ) -> torch.Tensor:
         raise NotImplementedError
 
     def tokenize_with_mapping(self,
@@ -111,7 +116,7 @@ class HuggingFaceContextualizer(Contextualizer):
                 input_ids=indices_tensor,
                 attention_mask=None
             )
-            embs = self.select_output(model_output)
+            embs = self.select_output(model_output, self.options)
             return embs, input_mask
 
 class BERTContextualizer(HuggingFaceContextualizer):
@@ -119,9 +124,10 @@ class BERTContextualizer(HuggingFaceContextualizer):
     def __init__(self,
                  hf_tokenizer: transformers.BertTokenizerFast,
                  hf_model: transformers.BertModel,
+                 options: str, 
                  device: str
                  ):
-        super(BERTContextualizer, self).__init__(hf_tokenizer, hf_model, device)
+        super(BERTContextualizer, self).__init__(hf_tokenizer, hf_model, options, device)
 
 
     @classmethod
@@ -132,9 +138,10 @@ class BERTContextualizer(HuggingFaceContextualizer):
         if not tokenizer_only and device != "cpu":
             hf_model.cuda(device=device)
         return cls(
-            hf_tokenizer=hf_tokenizer,
-            hf_model=hf_model,
-            device=device
+            hf_tokenizer = hf_tokenizer,
+            hf_model = hf_model,
+            options = "embe", # cls_re / lhs_re / embe
+            device = device
         )
 
     def get_tokenizer(self):
@@ -144,12 +151,15 @@ class BERTContextualizer(HuggingFaceContextualizer):
         # account for [CLS] and [SEP]
         return [-1] + mapping + [max(mapping) + 1]
 
-    def select_output(self, output: Any) -> torch.Tensor: 
-        cls_re = output.pooler_output  # R[Batch, Emb] w.r.t token '[CLS]' of last hidden layer
-        lhs_re = output.last_hidden_state # R[Batch, Word, Emb] w.r.t last hidden layer
-        hidden_states_ = output.hidden_states  # List_Layer[R[Batch, Word, Emb]] of 13 length
-        embes = hidden_states_[0]  #  R[Batch, Word, Emb] w.r.t embedding
-        return embes
+    def select_output(self, output: Any, options) -> torch.Tensor: 
+
+        model_output = {
+            "cls_re": lambda: output.pooler_output,  # R[Batch, Emb] w.r.t token '[CLS]' of last hidden layer
+            "lhs_re": lambda:  output.last_hidden_state,  # R[Batch, Word, Emb] w.r.t last hidden layer
+            "embe": lambda: output.hidden_states[0]  #  R[Batch, Word, Emb] w.r.t embedding
+        }[self.options]()  # R[Batch, Emb]
+
+        return model_output
 
 
 
