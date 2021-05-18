@@ -2,39 +2,32 @@ import numpy as np
 import json, sys, random, re, matplotlib
 from sklearn.metrics import f1_score, classification_report, accuracy_score
 from colorama import Fore, Back, Style
+import torch
+from torch.utils.tensorboard import SummaryWriter
 
 from logger import logger
 import nfgec_evaluate 
 from bert_encoder import  get_contextualizer
 import data_utils as dutils
-from data_utils import batch_to_wordpieces
+from data_utils import batch_to_wordpieces, save_list_to_file
 from load_config import load_config, device
 cf = load_config()
 
 from pathlib import Path
 here = Path(__file__).parent
 
-import torch
-from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter('runs/bbn_modified')
 
 
-# Ensure deterministic behavior
-torch.manual_seed(0xDEADBEEF)
-np.random.seed(0xDEADBEEF)
-random.seed(0xDEADBEEF)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
 
 class ModelEvaluator():
 
-	def __init__(self, model, data_loader, hierarchy, mode="train"):
+	def __init__(self, model, data_loader, hierarchy, writer, mode="train"):
 		self.model = model 
 		self.data_loader = data_loader 		
 		self.hierarchy = hierarchy
+		self.writer = writer
 		self.mode = mode
 		self.best_f1_and_epoch = [0.0, -1]
-
 
 	# Evaluate a given model via F1 score over the entire test corpus.
 	def evaluate_model(self, epoch):		
@@ -53,21 +46,6 @@ class ModelEvaluator():
 		average_scores = []
 		num_batches = len(self.data_loader)
 		labels_set = []
-
-		# Convert all one-hot to categories
-		def build_true_and_preds(self, tys, preds):
-			true_and_prediction = []
-			empty = 0
-			for i, row in enumerate(tys):	
-				true_cats = self.hierarchy.onehot2categories(tys[i])		
-				pred_cats = self.hierarchy.onehot2categories(preds[i])
-				true_and_prediction.append((true_cats,pred_cats))
-				if pred_cats == []:
-					empty += 1
-			if empty > 0:
-				logger.warn("There were %d empty predictions." % empty)
-			return true_and_prediction	
-	
 		
 		for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(self.data_loader):
 			
@@ -101,35 +79,27 @@ class ModelEvaluator():
 				s += "Actual: "							
 				s += ", ".join(every_tuple[0])
 				s += "\n\n"
+			logger.info("\n" + s)
 
-				for pred in every_tuple[1]:
+			fname = '{}/{}/{}/{}/'.format(here, "outputs", self.model.dataset, self.model.model_name)
+			for pred in every_tuple[1]:
 					if pred in every_tuple[0]:
-						with open(here / "predictions" /self.model.dataset/ "(partial)predicted", "a") as out:
-							print(entities[i], file=out)
-							print(every_tuple, file=out)
+						save_list_to_file((entities[i], every_tuple), "(partial) predicted", fname, mode = 'a')
 					else:
-						with open(here / "predictions" /self.model.dataset/"unpredicted", "a") as out:
-							print(entities[i], file=out)
-							print(every_tuple, file=out)
-
-			logger.info("\n" + s)	
+						save_list_to_file((entities[i], every_tuple), "unpredicted", fname, mode = 'a')
 				
 			sys.stdout.write("\rEvaluating batch %d / %d" % (i, num_batches))
 
-			with open(here / "predictions" /self.model.dataset/"labels_set", "w") as out:
-				print(len(labels_set), file = out)
-				print(labels_set, file=out)
-		
-
-		
-
 		print("")
 		print(len(true_and_prediction))
+		save_list_to_file(labels_set, "labels_set", fname, mode = 'w')
 		micro, macro, acc = nfgec_evaluate.loose_micro(true_and_prediction)[2], nfgec_evaluate.loose_macro(true_and_prediction)[2], nfgec_evaluate.strict(true_and_prediction)[2]
 		logger.info("                  Micro F1: %.4f\tMacro F1: %.4f\tAcc: %.4f" % (micro, macro, acc))
-		writer.add_scalar("Accuracy/train", acc, epoch)
+		self.writer.add_scalar("Accuracy/Evaluation", acc, epoch)
+
 		accuracy_scores.append(acc)
 		average_scores.append((acc + macro + micro) / 3)
+
 		return (acc + macro + micro) / 3
 
 	# Save the best model to the best model directory, and save a small json file with some details (epoch, f1 score).
@@ -174,7 +144,6 @@ class ModelEvaluator():
 				exit()
 				
 def create_model(data_loaders, hierarchy, total_wordpieces):
-
 	from model import  MentionLevelModel
 	model = MentionLevelModel(	embedding_dim = cf.EMBEDDING_DIM,
 						hidden_dim = cf.HIDDEN_DIM,
@@ -182,7 +151,6 @@ def create_model(data_loaders, hierarchy, total_wordpieces):
 						dataset = cf.DATASET,
 						model_options = cf.MODEL_OPTIONS,
 						total_wordpieces = total_wordpieces,
-						category_counts = hierarchy.get_train_category_counts(),
 						context_window = cf.MODEL_OPTIONS['context_window'],
 						attention_type = cf.MODEL_OPTIONS['attention_type'],
 						mention_window = cf.MODEL_OPTIONS['mention_window'],
@@ -209,8 +177,9 @@ def evaluate_without_loading(data_loaders, hierarchy, total_wordpieces):
 
 
 def main():
-	from model import  MentionLevelModel
-	import jsonlines	
+	import jsonlines		
+	# Ensure deterministic behavior
+	dutils.set_seed()
 
 	logger.info("Loading files...")
 	data_loaders = dutils.load_obj_from_pkl_file('data loaders', cf.ASSET_FOLDER + '/data_loaders.pkl')
@@ -222,8 +191,17 @@ def main():
 	model.cuda()
 	model.load_state_dict(torch.load(cf.BEST_MODEL_FILENAME))
 
+	metric_folder ='{}/{}/{}/'.format(here, model.dataset, model.model_name)
+	if not os.path.exists(os.path.dirname(metric_folder)):
+		try:
+			os.makedirs(os.path.dirname(metric_folder))
+		except OSError as exc:
+			if exc.errno != errno.EEXITST:
+				raise
+	writer = SummaryWriter(metric_folder)
 
-	modelEvaluator = ModelEvaluator(model, data_loaders['test'], hierarchy, mode="test")	
+	modelEvaluator = ModelEvaluator(model, data_loaders['test'], hierarchy, writer = writer, mode="test")
+
 	with jsonlines.open(cf.BEST_MODEL_JSON_FILENAME, "r") as reader:
 		for line in reader:
 			f1_score, epoch = line['f1_score'], line['epoch']

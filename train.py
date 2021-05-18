@@ -4,6 +4,7 @@ import time, json, os
 import torch
 from torch.autograd import Variable
 import torch.optim as optim
+from torch.utils.tensorboard import SummaryWriter
 
 from progress_bar import ProgressBar
 import data_utils as dutils
@@ -16,25 +17,13 @@ from load_config import load_config, device
 cf = load_config()
 
 from pathlib import Path
-here = Path(__file__).parent
+here = Path(__file__).parent	
 
-from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter('runs/bbn_modified')
+def train(model, data_loaders,  hierarchy, writer, epoch_start = 1):
 
-torch.manual_seed(0xDEADBEEF)
-np.random.seed(0xDEADBEEF)
-random.seed(0xDEADBEEF)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-
-def train(model, data_loaders,  hierarchy, epoch_start = 1):
 	logger.info("Training model.")
-
-
-	modelEvaluator = ModelEvaluator(model, data_loaders['dev'], hierarchy)
-	
-	optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=cf.LEARNING_RATE)
-    
+	modelEvaluator = ModelEvaluator(model, data_loaders['dev'], hierarchy, writer)	
+	optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=cf.LEARNING_RATE)    
 	model.cuda()
 
 	num_batches = len(data_loaders["train"])
@@ -60,6 +49,9 @@ def train(model, data_loaders,  hierarchy, epoch_start = 1):
 			optimizer.step()
 			epoch_losses.append(loss)
 
+			# Write loss to tensorboard
+			writer.add_scalar("Loss/Train", loss, epoch)
+
 			# Draw the progress bar
 			progress_bar.draw_bar(i, epoch, epoch_start_time)			
 
@@ -77,7 +69,6 @@ def create_model(data_loaders,  hierarchy, total_wordpieces):
 						dataset = cf.DATASET,
 						model_options = cf.MODEL_OPTIONS,
 						total_wordpieces = total_wordpieces,
-						category_counts = hierarchy.get_train_category_counts(),
 						context_window = cf.MODEL_OPTIONS['context_window'],
 						attention_type = cf.MODEL_OPTIONS['attention_type'],
 						mention_window = cf.MODEL_OPTIONS['mention_window'],
@@ -93,10 +84,11 @@ def train_without_loading(data_loaders, hierarchy, total_wordpieces):
 	train(model, data_loaders, hierarchy)
 
 
-def main():			
+def main():
+	# Ensure deterministic behavior
+	dutils.set_seed()
 
 	logger.info("Loading files...")
-
 	data_loaders = dutils.load_obj_from_pkl_file('data loaders', cf.ASSET_FOLDER + '/data_loaders.pkl')
 	total_wordpieces = dutils.load_obj_from_pkl_file('total wordpieces', cf.ASSET_FOLDER + '/total_wordpieces.pkl')
 	hierarchy = dutils.load_obj_from_pkl_file('hierarchy', cf.ASSET_FOLDER + '/hierarchy.pkl')
@@ -105,16 +97,18 @@ def main():
 	model = create_model(data_loaders, hierarchy, total_wordpieces)		
 	model.cuda()
 
-	folder ='{}/{}/{}/'.format(here, "predictions", model.dataset)
-	if not os.path.exists(os.path.dirname(folder)):
+	metric_folder ='{}/{}/{}/{}/'.format(here, 'runs', model.dataset, model.model_name)
+	if not os.path.exists(os.path.dirname(metric_folder)):
 		try:
-			os.makedirs(os.path.dirname(folder))
+			os.makedirs(os.path.dirname(metric_folder))
 		except OSError as exc:
 			if exc.errno != errno.EEXITST:
 				raise
+	writer = SummaryWriter(metric_folder)
 
-	train(model, data_loaders, hierarchy)
+	train(model, data_loaders, hierarchy, writer)
 	writer.flush()
+
 
 if __name__ == "__main__":
 	main()

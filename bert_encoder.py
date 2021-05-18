@@ -7,6 +7,8 @@ class Contextualizer:
     """
     Wraps around any contextualizer with optional subword tokenization.
     This abstracts over the following 3 cases:
+      - GloVe et al. (no contextualization);
+      - ELMo et al. (character-based);
       - BERT et al. (subword-based).
     These are encapsulated in the following 3 steps, as represented
     by the 3 abstract methods.
@@ -22,7 +24,6 @@ class Contextualizer:
         optionally index (ELMo does not do this) these subword units into IDs,
         and returns a mapping of the tokenized symbols and the original token indices.
         :param sentence: List of original tokens
-        :param lang: Language ID
         :return: (subword token indices, index mapping)
         """
         raise NotImplementedError

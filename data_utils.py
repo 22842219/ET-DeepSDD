@@ -2,7 +2,7 @@ import pickle as pkl
 from torch.utils.data import Dataset
 from logger import logger
 import torch
-import codecs, sys
+import codecs, sys, os, random
 import numpy as np
 from load_config import device
 
@@ -12,19 +12,43 @@ def save_obj_to_pkl_file(obj, obj_name, fname):
 		pkl.dump(obj, f, protocol=2)
 		logger.info("Saved %s to %s." % (obj_name, fname))
 
-
-# Save a list to a file, with each element on a newline.
-def save_list_to_file(ls, ls_name, fname):
-	with codecs.open(fname, 'w', 'utf-8') as f:
-		f.write("\n".join(ls))
-		logger.debug("Saved %s to %s." % (ls_name, fname))		
-
 # Load an object from a pickle file and provide a message when complete.
 def load_obj_from_pkl_file(obj_name, fname):
 	with open(fname, 'rb') as f:
 		obj = pkl.load(f)
 		logger.info("Loaded %s from %s." % (obj_name, fname))		
 	return obj
+
+# Save a list to a file, with each element on a newline.
+def save_list_to_file(ls, ls_name, fname, mode):
+	if not os.path.exists(os.path.dirname(fname)):
+			try:
+				os.makedirs(os.path.dirname(fname))
+			except OSError as exc:
+				if exc.errno != errno.EEXITST:
+					raise
+	with open(fname + ls_name, mode) as out:
+		print(ls, file = out)
+				
+def set_seed(seed_value = 0xDEADBEEF):
+    """Set seed for reproducibility.
+    """
+    random.seed(seed_value)
+    np.random.seed(seed_value)
+    torch.manual_seed(seed_value)
+    torch.cuda.manual_seed_all(seed_value)
+
+
+# Convert an entire batch to wordpieces using the vocab object.
+def batch_to_wordpieces(batch_x, tokenizer):
+	wordpieces = []
+	for wp_ids in batch_x:
+		wp = tokenizer.convert_ids_to_tokens(wp_ids)
+		if '[PAD]' in wp:
+			wordpieces.append(wp[:wp.index('[PAD]')])
+		else:
+			wordpieces.append(wp)
+	return wordpieces
 
 
 # An EntityTypingDataset, comprised of multiple Sentences.
@@ -177,15 +201,4 @@ class CategoryHierarchy():
 			raise Exception("Categories have not yet been frozen and sorted. Please call the freeze_categories() method first.")
 		return self.categories
 
-
-# Convert an entire batch to wordpieces using the vocab object.
-def batch_to_wordpieces(batch_x, tokenizer):
-	wordpieces = []
-	for wp_ids in batch_x:
-		wp = tokenizer.convert_ids_to_tokens(wp_ids)
-		if '[PAD]' in wp:
-			wordpieces.append(wp[:wp.index('[PAD]')])
-		else:
-			wordpieces.append(wp)
-	return wordpieces
 

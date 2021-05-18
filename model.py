@@ -6,35 +6,28 @@ import torch.nn.functional as F
 import pandas as pd
 import numpy as np
 from array import array
-
-
+from typing import *
+import random
+import torch
+import torch.nn.functional as F
 import pysdd
 from pysdd.sdd import Vtree, SddManager, WmcManager
 from graphviz import Source
-
+from compute_mpe import CircuitMPE
+from bert_encoder import  get_contextualizer
 from load_config import load_config, device
+import data_utils as dutils
 from pathlib import Path
 here = Path(__file__).parent
 
-
-from compute_mpe import CircuitMPE
-
-torch.manual_seed(123)
-torch.backends.cudnn.deterministic=True
-from typing import *
-import torch
-import torch.nn.functional as F
-from bert_encoder import  get_contextualizer
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+dutils.set_seed()
 
 class Pooler(torch.nn.Module):
-
     def __init__(self,
-                 dim: int = 768,
-                 dropout_rate: float = 0.5 ,
-                 pooling: str = "attention",  # max / mean / attention
-                 device: str = "cuda:0"
+                 dim: int,
+                 dropout_rate: float,
+                 pooling: str,  # max / mean / attention	
+                 device: str 
                  ):
         super(Pooler, self).__init__()
         self.device = device
@@ -42,7 +35,6 @@ class Pooler(torch.nn.Module):
         self.dim = dim
         self.dropout = torch.nn.Dropout(dropout_rate)
         self.projection = torch.nn.Linear(self.dim, self.dim)
-
 
         if self.pooling == "attention":
             self.query = torch.nn.Parameter(torch.zeros(dim, dtype=torch.float32)) 
@@ -87,27 +79,28 @@ class MentionLevelModel(nn.Module):
 				label_size, 
 				model_options, 
 				total_wordpieces, 
-				category_counts, 
 				hierarchy_matrix, 
 				context_window, 
 				mention_window, 
 				attention_type, 
 				use_context_encoders):
-		super(MentionLevelModel, self).__init__()
 
+		super(MentionLevelModel, self).__init__()
 		self.dataset = dataset
 		self.embedding_dim = embedding_dim
 		self.hidden_dim = hidden_dim
 		self.label_size = label_size
 		self.use_hierarchy 	 = model_options['use_hierarchy']
 		self.use_bilstm 	 = model_options['use_bilstm']
+		self.pooling 	 = model_options['pooling']
+		self.model_name =  model_options['model_name'] # Prediction folder specifier
 		self.hierarchy_matrix = hierarchy_matrix
 		self.context_window = context_window
 		self.mention_window = mention_window
 
 		self.dropout = nn.Dropout(p=0.5)
 		self.bc = get_contextualizer("bert-base-cased", device='cuda:0') # R[Batch, Words, Emb]
-		self.embed_pooled = Pooler(dim =self.embedding_dim, dropout_rate=0.5) # R[Batch, Emb]
+		self.embed_pooled = Pooler(dim =self.embedding_dim, dropout_rate=0.5, pooling = self.pooling, device ='cuda:0') # R[Batch, Emb]
 
 		if self.use_bilstm:
 			self.lstm = nn.LSTM(hidden_dim,hidden_dim,1,bidirectional=True)
@@ -193,9 +186,7 @@ class MentionLevelModel(nn.Module):
 		autohits = 0
 		
 		nonzeros = set(torch.index_select(hits.nonzero(), dim=1, index=torch.tensor([0]).to(device)).unique().tolist())
-		#print hits.nonzero()
-		#print "---"
-		#print len(nonzeros), len(hits)
+		
 		# If any prediction rows are entirely zero, select the class with the highest probability instead.
 		if len(nonzeros) != len(hits):		
 			am = preds.max(1)[1]
