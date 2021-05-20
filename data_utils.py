@@ -53,8 +53,6 @@ def batch_to_wordpieces(batch_x):
 		wordpieces.append(' '.join([ids_to_wp[i] for i in wp_ids.tolist() if i!=0]))
 	return wordpieces
 
-def wordpieces_to_bert_embs(batch_x, bc):
-	return bc.encode(batch_x, frozen=True)
 
 # An EntityTypingDataset, comprised of multiple Sentences.
 class EntityTypingDataset(Dataset):

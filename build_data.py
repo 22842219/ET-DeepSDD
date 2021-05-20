@@ -144,6 +144,7 @@ def build_hierarchy(filepaths):
 
 	return hierarchy
 
+
 def build_dataset(filepath, hierarchy, ds_name, contextualizer, tokenizer):
 
 	total_sents = 0
@@ -203,7 +204,8 @@ def build_dataset(filepath, hierarchy, ds_name, contextualizer, tokenizer):
 		data_xr.append(np.asarray(mention.wp_ids_right_padding))
 		data_xa.append(np.asarray(mention.wp_ids_all_padding))
 		data_xm.append(np.asarray(mention.wp_ids_mention_padding))
-		data_y.append(np.asarray(mention.labels))		
+		data_y.append(np.asarray(mention.labels))
+
 	dataset = MentionTypingDataset(data_xl, data_xr, data_xa, data_xm, data_y)
 
 	return dataset, total_wordpieces
@@ -231,7 +233,7 @@ def main():
 	data_loaders = {}
 	for ds_name, filepath in dataset_filenames.items():
 		logger.info("Loading %s dataset from %s." % (ds_name, filepath))
-		dataset, total_wordpieces = build_dataset(filepath, hierarchy, ds_name, contextualizer,tokenizer)
+		dataset, total_wordpieces = build_dataset(filepath, hierarchy, ds_name, contextualizer, tokenizer)
 		data_loader = DataLoader(dataset, batch_size=cf.BATCH_SIZE, pin_memory=True)
 		data_loaders[ds_name] = data_loader
 		logger.info("The %s dataset was built successfully." % ds_name)

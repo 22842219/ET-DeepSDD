@@ -45,8 +45,7 @@ class ModelEvaluator():
 			
 			batch_true_and_predictions = []
 							
-			mention_preds = self.model.evaluate(batch_xl, batch_xr, batch_xa, batch_xm)
-			batch_y = batch_y.float().to(device)
+			mention_preds = self.model.evaluate(batch_xl, batch_xr, batch_xa, batch_xm)	
 
 			for j, row in enumerate(batch_y):				
 
@@ -87,7 +86,9 @@ class ModelEvaluator():
 		save_list_to_file(labels_set, "labels_set", fname, mode = 'w')
 		micro, macro, acc = nfgec_evaluate.loose_micro(true_and_prediction)[2], nfgec_evaluate.loose_macro(true_and_prediction)[2], nfgec_evaluate.strict(true_and_prediction)[2]
 		logger.info("                  Micro F1: %.4f\tMacro F1: %.4f\tAcc: %.4f" % (micro, macro, acc))
-		self.writer.add_scalar("Accuracy/Evaluation", acc, epoch)
+		
+		if self.mode == 'train':
+			self.writer.add_scalar("Accuracy/Evaluation", acc, epoch)
 
 		accuracy_scores.append(acc)
 		average_scores.append((acc + macro + micro) / 3)
@@ -190,7 +191,6 @@ def main():
 			f1_score, epoch = line['f1_score'], line['epoch']
 
 	modelEvaluator.evaluate_model(epoch)	
-	writer.flush()	
 
 if __name__ == "__main__":
 	main()
