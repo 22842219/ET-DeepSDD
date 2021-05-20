@@ -99,9 +99,9 @@ class Mention(Sentence):
 		self.wp_ids_mention = self.wordpiece_ids[self.wp_mention_start : self.wp_mention_end]	
 		self.wp_ids_all = self.wp_ids_left + self.wp_ids_mention + self.wp_ids_right
 
-		self.wp_ids_left_padding = self.wp_ids_left[:2*token_span] + [0]*(2*token_span - len(self.wp_ids_left ))
-		self.wp_ids_right_padding = self.wp_ids_right[:2*token_span] + [0]*(2*token_span - len(self.wp_ids_right ))
-		self.wp_ids_mention_padding = self.wp_ids_mention[:2*mention_span] + [0]*(2*mention_span - len(self.wp_ids_mention ))
+		self.wp_ids_left_padding = self.wp_ids_left[:token_span] + [0]*(token_span - len(self.wp_ids_left ))
+		self.wp_ids_right_padding = self.wp_ids_right[:token_span] + [0]*(token_span - len(self.wp_ids_right ))
+		self.wp_ids_mention_padding = self.wp_ids_mention[:mention_span] + [0]*(mention_span - len(self.wp_ids_mention ))
 		self.wp_ids_all_padding =  self.wp_ids_left_padding + self.wp_ids_mention_padding + self.wp_ids_right_padding
 
 	def is_valid(self):
@@ -226,7 +226,7 @@ def main():
 	contextualizer = get_contextualizer("bert-base-cased", device = device)
 	tokenizer = contextualizer.get_tokenizer()
 
-	vocab = tokenizer.save_vocabulary(save_directory= "/home/ziyu/Desktop/CODE/ET-DeepSDD")
+	# vocab = tokenizer.save_vocabulary(save_directory= "/home/ziyu/Desktop/CODE/ET-DeepSDD")
 
 	data_loaders = {}
 	for ds_name, filepath in dataset_filenames.items():

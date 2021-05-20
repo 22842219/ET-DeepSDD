@@ -106,7 +106,7 @@ class MentionLevelModel(nn.Module):
 			self.lstm = nn.LSTM(hidden_dim,hidden_dim,1,bidirectional=True)
 			self.layer_1 = nn.Linear(hidden_dim*6, hidden_dim)
 		else:
-			self.layer_1 = nn.Linear(hidden_dim*3, hidden_dim)		
+			self.layer_1 = nn.Linear(hidden_dim*3, hidden_dim // 2)		
 		
 		self.use_context_encoders = use_context_encoders
 		self.projection = nn.Linear(embedding_dim, hidden_dim)	
@@ -118,7 +118,7 @@ class MentionLevelModel(nn.Module):
 		elif self.attention_type == "scalar":
 			self.component_weights = nn.Parameter(torch.ones(3).float())
 
-		self.hidden2tag = nn.Linear(hidden_dim, label_size)
+		self.hidden2tag = nn.Linear(hidden_dim //2 , label_size)
 	
 	def forward(self, batch_xl, batch_xr, batch_xa, batch_xm):
 

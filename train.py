@@ -3,7 +3,8 @@ import random
 import time, json, os
 import torch
 from torch.autograd import Variable
-import torch.optim as optim
+# import torch.optim as optim
+from torch.optim.adamw import AdamW
 from torch.utils.tensorboard import SummaryWriter
 
 from progress_bar import ProgressBar
@@ -23,7 +24,11 @@ def train(model, data_loaders,  hierarchy, writer, epoch_start = 1):
 
 	logger.info("Training model.")
 	modelEvaluator = ModelEvaluator(model, data_loaders['dev'], hierarchy, writer)	
-	optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=cf.LEARNING_RATE)    
+	# optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=cf.LEARNING_RATE)  
+	optimizer = AdamW(
+        params=model.parameters(),
+        lr = cf.LEARNING_RATE,
+        weight_decay= 0.1)  
 	model.cuda()
 
 	num_batches = len(data_loaders["train"])
@@ -37,6 +42,7 @@ def train(model, data_loaders,  hierarchy, writer, epoch_start = 1):
 		epoch_start_time = time.time()
 
 		for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(data_loaders["train"]):	
+			
 			batch_y = batch_y.float().to(device) 
 			# Feed these Bert vectors to our model
 			model.zero_grad()

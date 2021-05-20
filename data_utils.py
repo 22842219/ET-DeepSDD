@@ -5,6 +5,8 @@ import torch
 import codecs, sys, os, random
 import numpy as np
 from load_config import device
+from pathlib import Path
+here = Path(__file__).parent
 
 # Save an object to a pickle file and provide a message when complete.
 def save_obj_to_pkl_file(obj, obj_name, fname):
@@ -40,16 +42,19 @@ def set_seed(seed_value = 0xDEADBEEF):
 
 
 # Convert an entire batch to wordpieces using the vocab object.
-def batch_to_wordpieces(batch_x, tokenizer):
+def batch_to_wordpieces(batch_x):
+	ids_to_wp ={}
+	file = '{}/{}'.format(here, 'vocab.txt')	
+	with open(file) as f:
+		for i, line in enumerate(f):
+			ids_to_wp[i] = line.rstrip('\n')
 	wordpieces = []
 	for wp_ids in batch_x:
-		wp = tokenizer.convert_ids_to_tokens(wp_ids)
-		if '[PAD]' in wp:
-			wordpieces.append(wp[:wp.index('[PAD]')])
-		else:
-			wordpieces.append(wp)
+		wordpieces.append(' '.join([ids_to_wp[i] for i in wp_ids.tolist() if i!=0]))
 	return wordpieces
 
+def wordpieces_to_bert_embs(batch_x, bc):
+	return bc.encode(batch_x, frozen=True)
 
 # An EntityTypingDataset, comprised of multiple Sentences.
 class EntityTypingDataset(Dataset):

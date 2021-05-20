@@ -7,7 +7,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 from logger import logger
 import nfgec_evaluate 
-from bert_encoder import  get_contextualizer
 import data_utils as dutils
 from data_utils import batch_to_wordpieces, save_list_to_file
 from load_config import load_config, device
@@ -31,11 +30,6 @@ class ModelEvaluator():
 
 	# Evaluate a given model via F1 score over the entire test corpus.
 	def evaluate_model(self, epoch):		
-		if cf.EMBEDDING_MODEL == "bert":
-			self.bc =  get_contextualizer("bert-base-cased", device='cuda:0')
-			tokenizer = self.bc.get_tokenizer()
-		else:
-			self.bc = None
 
 		self.model.zero_grad()
 		self.model.eval()	
@@ -50,7 +44,6 @@ class ModelEvaluator():
 		for (i, (batch_xl, batch_xr, batch_xa, batch_xm, batch_y)) in enumerate(self.data_loader):
 			
 			batch_true_and_predictions = []
-			entities = []		
 							
 			mention_preds = self.model.evaluate(batch_xl, batch_xr, batch_xa, batch_xm)
 			batch_y = batch_y.float().to(device)
@@ -65,12 +58,11 @@ class ModelEvaluator():
 				true_and_prediction.append((labels, preds))
 				batch_true_and_predictions.append((labels, preds))
 
-				for every_wordpieces in batch_to_wordpieces(batch_xm, tokenizer):
-					entity = ' '.join(every_wordpieces)
-					entities.append(entity						)
+
+			mentioned_entities= batch_to_wordpieces(batch_xm)
 			s = ""	
 			for i, every_tuple in enumerate(batch_true_and_predictions):
-				s += " ".join(entities[i])	
+				s += " ".join(mentioned_entities[i])	
 				s += "\n"				
 				s += "Predicted: "
 				ps = ", ".join(["%s%s%s" % (Fore.GREEN if pred in every_tuple[0] else Fore.RED, pred, Style.RESET_ALL) for pred in every_tuple[1]])							
@@ -84,9 +76,9 @@ class ModelEvaluator():
 			fname = '{}/{}/{}/{}/'.format(here, "outputs", self.model.dataset, self.model.model_name)
 			for pred in every_tuple[1]:
 					if pred in every_tuple[0]:
-						save_list_to_file((entities[i], every_tuple), "(partial) predicted", fname, mode = 'a')
+						save_list_to_file((mentioned_entities[i], every_tuple), "(partial) predicted", fname, mode = 'a')
 					else:
-						save_list_to_file((entities[i], every_tuple), "unpredicted", fname, mode = 'a')
+						save_list_to_file((mentioned_entities[i], every_tuple), "unpredicted", fname, mode = 'a')
 				
 			sys.stdout.write("\rEvaluating batch %d / %d" % (i, num_batches))
 
@@ -161,7 +153,6 @@ def create_model(data_loaders, hierarchy, total_wordpieces):
 
 def evaluate_without_loading(data_loaders, hierarchy, total_wordpieces):
 	from model import E2EETModel, MentionLevelModel
-	from bert_encoder import  get_contextualizer
 	import jsonlines
 	
 	logger.info("Loading files...")	
@@ -191,16 +182,8 @@ def main():
 	model.cuda()
 	model.load_state_dict(torch.load(cf.BEST_MODEL_FILENAME))
 
-	metric_folder ='{}/{}/{}/'.format(here, model.dataset, model.model_name)
-	if not os.path.exists(os.path.dirname(metric_folder)):
-		try:
-			os.makedirs(os.path.dirname(metric_folder))
-		except OSError as exc:
-			if exc.errno != errno.EEXITST:
-				raise
-	writer = SummaryWriter(metric_folder)
 
-	modelEvaluator = ModelEvaluator(model, data_loaders['test'], hierarchy, writer = writer, mode="test")
+	modelEvaluator = ModelEvaluator(model, data_loaders['test'], hierarchy, writer = None, mode="test")
 
 	with jsonlines.open(cf.BEST_MODEL_JSON_FILENAME, "r") as reader:
 		for line in reader:
