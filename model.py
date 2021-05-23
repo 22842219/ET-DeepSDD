@@ -22,6 +22,32 @@ here = Path(__file__).parent
 
 dutils.set_seed()
 
+class FeatureExtractor(torch.nn.Module):
+
+    def __init__(self,
+    			dim: int):
+        super(FeatureExtractor, self).__init__()
+        self.dim = dim
+        self.mention_query_transform = torch.nn.Linear(self.dim, self.dim)
+        torch.nn.init.normal_(self.mention_query_transform.weight, mean=0.0, std=0.02)
+        torch.nn.init.zeros_(self.mention_query_transform.bias)
+
+    def forward(self,
+                sentence: torch.Tensor,  # R[Batch, Word, Emb] 
+                span_pooled: torch.Tensor,  # R[Batch, Emb]
+                span_mask: torch.Tensor  # R[Batch, word_ids]
+                ) -> torch.Tensor:  # R[Batch, Feature]
+
+        device = sentence.device
+        neg_inf = torch.tensor(-10000, dtype=torch.float32, device=device)
+
+        span_queries = self.mention_query_transform(span_pooled)
+        attn_scores = torch.einsum('be,bwe->bw', span_queries, sentence)  # R[Batch, Word]
+        masked_attn_scores = torch.where(span_mask.bool(), attn_scores, neg_inf) 
+        normalized_attn_scores = F.softmax(masked_attn_scores, dim=1)
+        context_pooled = torch.einsum('bwe,bw->be', sentence, normalized_attn_scores)  # R[Batch, Emb]   
+        return context_pooled  # R[Batch, Emb]
+
 class Pooler(torch.nn.Module):
     def __init__(self,
                  dim: int,
@@ -100,13 +126,14 @@ class MentionLevelModel(nn.Module):
 
 		self.dropout = nn.Dropout(p=0.5)
 		self.bc = get_contextualizer("bert-base-cased", device='cuda:0') # R[Batch, Words, Emb]
-		self.embed_pooled = Pooler(dim =self.embedding_dim, dropout_rate=0.5, pooling = self.pooling, device ='cuda:0') # R[Batch, Emb]
+		self.embed_pooled = Pooler(dim = self.embedding_dim, dropout_rate=0.5, pooling = self.pooling, device ='cuda:0') # R[Batch, Emb]
+		self.feature_extractor = FeatureExtractor(dim = self.embedding_dim)
 
 		if self.use_bilstm:
 			self.lstm = nn.LSTM(hidden_dim,hidden_dim,1,bidirectional=True)
 			self.layer_1 = nn.Linear(hidden_dim*6, hidden_dim)
 		else:
-			self.layer_1 = nn.Linear(hidden_dim*3, hidden_dim // 2)		
+			self.layer_1 = nn.Linear(hidden_dim*3, hidden_dim )		
 		
 		self.use_context_encoders = use_context_encoders
 		self.projection = nn.Linear(embedding_dim, hidden_dim)	
@@ -118,7 +145,7 @@ class MentionLevelModel(nn.Module):
 		elif self.attention_type == "scalar":
 			self.component_weights = nn.Parameter(torch.ones(3).float())
 
-		self.hidden2tag = nn.Linear(hidden_dim //2 , label_size)
+		self.hidden2tag = nn.Linear(hidden_dim , label_size)
 	
 	def forward(self, batch_xl, batch_xr, batch_xa, batch_xm):
 
@@ -133,6 +160,11 @@ class MentionLevelModel(nn.Module):
 		batch_xr = self.embed_pooled(bert_embs_r, span_mask_r)  # R[Batch, Emb]
 		batch_xm = self.embed_pooled(bert_embs_m, span_mask_m)  # R[Batch, Emb]	
 		# batch_xa = self.embed_pooled(bert_embs_a, span_mask_a)  # R[Batch, Emb]
+
+
+		batch_xl = self.feature_extractor(bert_embs_a, batch_xl, span_mask_a)
+		batch_xr = self.feature_extractor(bert_embs_a, batch_xr, span_mask_a)
+		batch_xm = self.feature_extractor(bert_embs_a, batch_xm, span_mask_a)
 
 		if self.use_bilstm:		
 			batch_xl = batch_xl.unsqueeze(0)
